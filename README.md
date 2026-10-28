@@ -45,6 +45,20 @@ counts the minutes, and moves the money. It never runs a model and never sees a 
 7. **Models come from Hugging Face by name.** Orbit checks fit. The host downloads and runs.
    V1 supports GGUF files.
 
+## The mark
+
+<img src="orbit/static/logo.svg" width="96" height="96" alt="Orbit logo: an open ring with a single small hollow node in the opening">
+
+A single ring, left open at the upper right, with one small hollow node resting in the opening.
+Two strokes, uniform weight, no text. The source is `orbit/static/logo.svg`.
+
+- **Freedom from restriction.** The ring is not closed. Nothing is sealed in and nothing is
+  kept out. The gap is the point.
+- **Private use of what is private.** The node is a hollow circle, a small room of its own, not
+  a dot on a tracker. It sits in the opening rather than on a rail.
+- **Orbit, subtly.** The node lies exactly on the ring's path, so it reads as something circling
+  you without drawing an orbit line. The name does the rest.
+
 ## Run it
 
 Needs Python 3.11 or newer. Nothing else: no database server, no cloud account.
