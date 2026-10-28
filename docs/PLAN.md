@@ -48,14 +48,14 @@ Orbit runs on the Arc OS operating model in its own repo, with no Arc keys, memo
 
 | Arc OS piece | Orbit copy |
 |---|---|
-| Root `CLAUDE.md` with numbered rules and a "where things live" table | `CLAUDE.md` in this kit |
-| `.claude/settings.json` deny list (no .env reads, no push to main, no force push, no rm -rf) | same, in this kit |
+| Root `CLAUDE.md` with numbered rules and a "where things live" table | `CLAUDE.md` in this repo |
+| `.claude/settings.json` deny list (no .env reads, no push to main, no force push, no rm -rf) | same, in this repo |
 | Branches only, `main` protected, PR per change; CI: lint, typecheck, test, build, gitleaks, Semgrep, npm audit | same CI, copied from Arc-OS |
-| `docs/GATES.md` | in this kit |
+| `docs/GATES.md` | in this repo |
 | `docs/adr/` | ADRs 0001 to 0006 written in Layer 1 |
 | `workspace/ARC-OS/` (router, skills, memory via `recall.mjs`, outputs, runs, `config/routines.json`) | `workspace/ORBIT/`, same layout |
 | Studio gauntlet (bar, builder, blind critic, shuffler, swap-order check, ratchet) | `docs/GAUNTLET.md` |
-| Jev confirms; under 60% sure, a person decides | Jev confirms each layer's audit, same rule |
+| Under 60% sure, a person decides | Cooper decides, same rule |
 | No sample data in a live panel | every number on the site and in the app is sourced or live |
 | Nothing depends on Cooper's computer being on | Vercel, Supabase, cloud scheduled tasks |
 
@@ -74,7 +74,7 @@ Orbit runs on the Arc OS operating model in its own repo, with no Arc keys, memo
 
 ## 4. The layers
 
-Every layer ends the same way: exit checks pass, whole-layer audit by a fresh critic, Jev confirms,
+Every layer ends the same way: exit checks pass, whole-layer audit by a fresh critic,
 PR, Cooper merges, a handoff file. Within a layer, lanes run in parallel; the lead session merges lanes
 and runs the exit checks.
 
@@ -90,7 +90,7 @@ Goal: nothing later is blocked on a missing tool or account.
 3. With Cooper: public repo `Diamond9k/orbit` (G1 licence), branch protection on `main`, Discussions on;
    Vercel project `orbit` on Cooper's own account, linked; Supabase project `orbit`; Stripe test mode
    account (G4); Discord server from the channel list (G3). Cooper adds every key himself in the dashboards.
-4. Push this kit as the first commit.
+4. Done: the plan is on `main` in the public repo `Diamond9k/orbit`.
 
 Exit: every tool in the inventory runs `--version`; the repo, Vercel project and Supabase project exist and
 a hello-world deploy succeeds from a PR preview.

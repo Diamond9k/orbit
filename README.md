@@ -85,9 +85,7 @@ never waved through.
 | [docs/GAUNTLET.md](docs/GAUNTLET.md) | The review loop: one builds, independent reviewers judge blind |
 | [docs/GATES.md](docs/GATES.md) | Decisions and accounts the owner still has to provide |
 | [docs/SCAN-locallyuncensored.md](docs/SCAN-locallyuncensored.md) | Notes on the competitor site used as the quality bar |
-| [docs/ULTRA.md](docs/ULTRA.md) | The one-run version of the build plan (wins over PLAN.md where they differ) |
-| [docs/PROMPTS.md](docs/PROMPTS.md) | The exact prompts used to run each layer |
-| [KICKOFF.md](KICKOFF.md) | The first prompt that starts the V1 build |
+| [docs/PROMPTS.md](docs/PROMPTS.md) | How the build is run: one prompt per layer, starting with P0 |
 
 ### Planned folder layout
 

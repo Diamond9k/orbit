@@ -19,7 +19,8 @@ works" check. Two extra prompts cover running out of usage mid-layer and reviewi
 
 ## P0: Machine and accounts
 
-Before sending: unzip the kit into an empty folder named `orbit`, open a terminal there, start Claude Code.
+Before sending: clone the repo with `git clone https://github.com/Diamond9k/orbit`, open a terminal in the
+`orbit` folder, start Claude Code.
 
 ```
 You are starting Orbit. Read CLAUDE.md, then docs/PLAN.md, docs/MARKETPLACE.md and docs/GATES.md.
@@ -34,7 +35,7 @@ Run Layer L0 from PLAN.md section 4, and only L0.
    "orbit", a Stripe account in test mode, and the Discord server with the channel list in PLAN.md.
    Do the parts the CLIs can do after I log in. Never ask me to paste a key into chat: tell me which
    dashboard and which setting name, and I will add it.
-4. Make the first commit with this kit on a branch, open a PR, and check the Vercel preview builds.
+4. Commit the L0 outputs on a branch, open a PR, and check the Vercel preview builds.
 5. Update docs/GATES.md with what closed and the evidence. Write the handoff file.
 
 Stop when L0's exit checks pass. Do not start L1.
@@ -57,8 +58,8 @@ later layer has to change it. Lane A copies only the named operating pieces from
 and nothing else from Arc.
 
 When all lanes are merged: run L1's exit checks, then a whole-layer audit by a fresh subagent that did
-not build anything, fix what it finds, have Jev confirm the audit if its key is set (otherwise say so),
-open the PR to main, update GATES.md, write the handoff. Popups for any decision. Stop after L1.
+not build anything, fix what it finds, open the PR to main, update GATES.md, write the handoff.
+Popups for any decision. Stop after L1.
 ```
 
 ## P2: Engines
@@ -77,7 +78,7 @@ Lane C builds the whole marketplace engine from MARKETPLACE.md against the simul
 with a test for every state change, every ledger posting, refunds, payouts and reconciliation.
 
 Exit checks are measured, not assumed: use a clean Windows VM for the install timing and tell me when
-you need me to run the iPhone test. Then the fresh-critic audit, Jev, PR, GATES.md, handoff. Stop after L2.
+you need me to run the iPhone test. Then the fresh-critic audit, PR, GATES.md, handoff. Stop after L2.
 ```
 
 ## P3: Surfaces
@@ -99,7 +100,7 @@ Then the gauntlet on the site exactly as GAUNTLET.md says: you build, fresh suba
 order swapped, fix only what failed, max 4 rounds per target. Targets from SCORECARD.md: 64, then 72,
 then 80 with 10/10 blind wins. If a target is missed, follow PLAN.md section 5. Never lower the bar.
 
-Then the fresh-critic audit, Jev, PR, GATES.md, handoff with before and after scores per dimension.
+Then the fresh-critic audit, PR, GATES.md, handoff with before and after scores per dimension.
 Stop after L3.
 ```
 
