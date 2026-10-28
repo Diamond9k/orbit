@@ -88,6 +88,17 @@ Open the newest file in `workspace/runs/`. Three outcomes:
 - **Builder got stuck or wandered.** The item was too vague. Rewrite it in `docs/NEXT.md` in
   smaller, plainer words. That is the fix, not a bigger model.
 
+## A stronger critic
+
+The critic is the best place to spend a little money: it reads one diff and writes a short
+list, so a cycle costs a few cents, and it catches what a 7B builder misses. In PowerShell,
+before running a cycle:
+```
+$env:ANTHROPIC_API_KEY = "your key"
+$env:CRITIC_MODEL = "claude-opus-5-5"
+```
+The builder stays on your GPU. Leave both unset and the critic runs locally.
+
 ## When to spend money
 
 Use a paid model only for what open models are weakest at: breaking a big vague item into

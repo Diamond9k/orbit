@@ -39,7 +39,11 @@ echo -e "\n## Tests\n" >> "$RUN"
 if python -m pytest -q 2>&1 | tee -a "$RUN"; then TESTS=pass; else TESTS=fail; fi
 
 echo -e "\n## Critic\n" >> "$RUN"
-CRITIC_OUT="$(aider --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
+# The critic can run on a stronger paid model: set CRITIC_MODEL=claude-opus-5-5 and
+# ANTHROPIC_API_KEY in your environment (never in the repo). Unset, it uses the local model.
+CRITIC_ARGS=()
+if [ -n "${CRITIC_MODEL:-}" ]; then CRITIC_ARGS=(--model "$CRITIC_MODEL"); fi
+CRITIC_OUT="$(aider "${CRITIC_ARGS[@]}" --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
 if echo "$CRITIC_OUT" | grep -qi "nothing found"; then CRITIC=clean; else CRITIC=flagged; fi
 
 # Where the branch goes decides what happens to it:
