@@ -286,8 +286,10 @@ def session_page(request: Request, sid: int, user=Depends(require_user), conn=De
     balance = ledger.balance(conn, f"user:{user['id']}")
     minutes_left = balance * 60 // s["price_cents_per_hour"] if s["price_cents_per_hour"] else 0
     started_epoch = int(datetime.fromisoformat(s["started_at"]).replace(tzinfo=timezone.utc).timestamp())
-    return render(request, "session.html", user=user, _conn=conn, s=s, balance=balance,
-                  minutes_left=minutes_left, started_epoch=started_epoch)
+    resp = render(request, "session.html", user=user, _conn=conn, s=s, balance=balance,
+                  minutes_left=minutes_left, started_epoch=started_epoch, flash=take_flash(request))
+    resp.delete_cookie("orbit_flash")
+    return resp
 
 
 def settle_session(conn: sqlite3.Connection, sid: int, user_id: int) -> None:

@@ -43,6 +43,8 @@ def test_full_loop(client):
     # a second session is refused while one runs, and sends you to the running one
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/sessions/1"
+    page = client.get("/sessions/1", cookies={"orbit_flash": "You already have a session running"}).text
+    assert "You already have a session running" in page
     # stop: one minute minimum at $0.60/h = 1 cent, host gets 80%, orbit 20%
     r = client.post("/sessions/1/stop", follow_redirects=False)
     assert r.status_code == 303
