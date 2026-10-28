@@ -1,9 +1,12 @@
 # Aider settings for the Orbit swarm. Aider reads this file from the repo root.
-# The model runs on this PC through Ollama. Change the name if you pull a different one.
-model: ollama_chat/qwen2.5-coder:32b
+# The model runs on this PC through llama.cpp's server (Vulkan build, works on the RX 580).
+# Start it first: see docs/SWARM.md.
+model: openai/local
+openai-api-base: http://127.0.0.1:8080/v1
+openai-api-key: local
 auto-commits: true
 auto-test: true
-test-cmd: python3 -m pytest -q
+test-cmd: python -m pytest -q
 read:
   - CLAUDE.md
   - docs/NEXT.md
