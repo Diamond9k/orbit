@@ -2,7 +2,7 @@
 # One swarm cycle: builder builds on a throwaway branch, tests run, critic reviews in ask
 # mode. Green and clean goes to build/ and merges itself on GitHub. Anything else goes to
 # review/ and waits. Nothing here touches main directly.
-# Needs: git, python3, aider, and Ollama running on this PC.
+# Needs: git, python, aider, and llama-server running on this PC.
 #
 #   swarm/run.sh                 one cycle from main
 #   BASE=some-branch swarm/run.sh
@@ -13,7 +13,10 @@ BASE="${BASE:-main}"
 STAMP="$(date +%Y-%m-%d-%H%M)"
 BRANCH="build/$STAMP"
 RUN="workspace/runs/$STAMP.md"
-export OLLAMA_API_BASE="${OLLAMA_API_BASE:-http://127.0.0.1:11434}"
+# The model server (llama.cpp) must already be running. See docs/SWARM.md.
+if ! curl -s -o /dev/null http://127.0.0.1:8080/v1/models; then
+  echo "No model server on port 8080. Start llama-server first (docs/SWARM.md)." >&2; exit 1
+fi
 
 if [ "$BASE" = "main" ] && [ "$(git branch --show-current)" = "main" ] && [ -n "$(git status --porcelain)" ]; then
   echo "Uncommitted changes on main. Commit or stash them first." >&2; exit 1
@@ -33,7 +36,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 echo -e "\n## Tests\n" >> "$RUN"
-if python3 -m pytest -q 2>&1 | tee -a "$RUN"; then TESTS=pass; else TESTS=fail; fi
+if python -m pytest -q 2>&1 | tee -a "$RUN"; then TESTS=pass; else TESTS=fail; fi
 
 echo -e "\n## Critic\n" >> "$RUN"
 CRITIC_OUT="$(aider --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"

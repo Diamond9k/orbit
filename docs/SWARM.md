@@ -7,7 +7,7 @@ one cycle at a time. The bible (CLAUDE.md), the tests and your merge are the loc
 
 | Piece | What |
 |---|---|
-| Ollama | Runs the coding model on your GPU and serves it locally |
+| llama.cpp (Vulkan build) | Runs the coding model on the GPU and serves it locally. Works on AMD cards like the RX 580 |
 | Aider | The agent. Reads the prompt, edits files, runs tests, commits |
 | `prompts/builder.md` | What the builder is told |
 | `prompts/critic.md` | What the critic is told |
@@ -17,40 +17,50 @@ one cycle at a time. The bible (CLAUDE.md), the tests and your merge are the loc
 
 ## The locks
 
-- The builder works on a throwaway branch named `build/<date>`. It never sees main.
-- Nothing is pushed unless the tests pass.
+- The builder works on a throwaway branch. It never sees main.
 - The critic runs in ask mode. It cannot edit a file.
-- Nothing is merged by any agent. You open the pull request and you merge.
+- Only a branch with passing tests and a clean critic goes to `build/`, and GitHub runs the
+  tests again before it merges. Everything else goes to `review/` and waits.
+- Cooper can revert anything.
 
-## Setup, once
+## Setup, once (Windows, AMD RX 580 or similar)
 
-1. Install Ollama from ollama.com. Then pull a coding model that fits your GPU memory:
+1. **Get llama.cpp.** From github.com/ggml-org/llama.cpp, Releases, download the Windows
+   Vulkan zip (its name contains `win-vulkan-x64`). Unzip it to `C:\llama`.
+2. **Get a coding model that fits 8 GB.** From Hugging Face, download
+   `Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf` (about 4.7 GB) into `C:\llama\models`.
+   Check Hugging Face for a newer 7B coding model at the time; any GGUF works.
+3. **Start the model server** in its own PowerShell window and leave it running:
    ```
-   ollama pull qwen2.5-coder:32b      # needs about 20 GB of GPU memory
-   ollama pull qwen2.5-coder:14b      # about 10 GB
+   C:\llama\llama-server.exe -m C:\llama\models\Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf -ngl 99 -c 16384 --port 8080
    ```
-   If you pull a different one, change `model:` in `.aider.conf.yml` to match.
-   Check Hugging Face and the Ollama library for what is best at the time.
-2. Install Python 3.11 or newer, then:
+   `-ngl 99` puts every layer on the GPU. If it fails to load, lower it to 24 and the rest
+   runs on the CPU, slower but fine overnight.
+4. **Install the tools** in another PowerShell window:
    ```
-   python3 -m pip install aider-chat
-   python3 -m pip install -r requirements-dev.txt
+   python -m pip install aider-chat
+   python -m pip install -r requirements-dev.txt
    ```
-3. Clone the repo and make sure `git push` works from this PC without a password prompt.
-4. Run one cycle by hand and watch it:
+5. **Make sure `git push` works** from this PC without a password prompt.
+6. **Try one cycle** from Git Bash (comes with Git for Windows):
    ```
    BASE=claude/zen-ride-rbvl70 swarm/run.sh
    ```
    Once that branch is merged, drop the `BASE=` part and it builds from main.
 
-## Running it on a schedule
+A 7B model handles small, clear tasks and struggles with vague ones. Keep `docs/NEXT.md`
+items tight. That matters more than any other setting.
 
-Only after you have watched a few cycles by hand and trust them. On Mac or Linux, add one
-line with `crontab -e`, using your real path:
+## Run it nightly
+
+Windows: open Task Scheduler, create a basic task, daily at 2 AM, action "Start a program":
+program `C:\Program Files\Git\bin\bash.exe`, arguments `C:\path\to\orbit\swarm\run.sh`.
+The model server from step 3 must be running.
+
+Mac or Linux: `crontab -e` and add
 ```
 0 2 * * * /full/path/to/orbit/swarm/run.sh >> /full/path/to/orbit/workspace/runs/cron.log 2>&1
 ```
-On Windows, use Task Scheduler to run `swarm/run.sh` through Git Bash.
 
 ## What happens to a branch
 
