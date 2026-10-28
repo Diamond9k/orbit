@@ -1,40 +1,44 @@
 # The swarm
 
-Agents that build Orbit toward the goal in CLAUDE.md, on your own PC. Five roles, one cycle.
-The bible, the tests, the guard and your revert are the locks.
+Agents that build Orbit toward the goal in CLAUDE.md, on your own PC, without turning off.
+Local open models do the volume for free. Claude touches only what cannot be wrong. What the
+local agents cannot finish is escalated to Cooper or a Claude session.
 
 ## The roles
 
-| Role | What it does | File | Model |
-|---|---|---|---|
-| Scoreboard | Reads the ledger: hosts paid, sessions by strangers, hosts online | `swarm/scoreboard.py` | none |
-| Stranger | Walks Orbit like a first-time user, every screen, and reports where it got stuck | `swarm/stranger.py`, `prompts/stranger.md` | `STRANGER_MODEL` |
-| Director | Owns the goal. Reads the bible, scoreboard, stranger report and last result, then rewrites the Now section of `docs/NEXT.md` | `swarm/director.py`, `prompts/director.md` | `DIRECTOR_MODEL` |
-| Builder | Takes the director's top item on a throwaway branch | Aider, `prompts/builder.md`, `.aider.conf.yml` | local |
-| Critic | Reads the diff cold and lists what a stranger would hit | Aider in ask mode, `prompts/critic.md` | `CRITIC_MODEL` |
+| Role | Model | What it does |
+|---|---|---|
+| Scout | local | Walks Orbit like a first-time user, every screen, reports where it got stuck |
+| Director | Claude, rarely | Decides what to build next from the goal, the scoreboard and the scout's report. Runs only when the Now list is empty or its top item is escalated |
+| Builder | local | Takes the top item on a throwaway branch |
+| Fixer | local | If tests fail, one free retry that may fix code but never tests |
+| Critic | local, then Claude for sensitive changes | First pass locally. If clean and the change touches money, sessions or the host program, Claude gets the final say |
+| Guard | none | Protected files send the branch to review no matter what |
 
-`swarm/run.sh` runs them in that order, then the guard checks protected files and the branch
-goes to `build/` (merges itself on GitHub) or `review/` (waits). Logs land in `workspace/runs/`.
+`swarm/run.sh` is one cycle. `swarm/forever.sh` runs cycles without end. After two failed
+cycles on one item it is marked escalated in `docs/NEXT.md`, described in
+`workspace/ESCALATE.md`, and the local agents move on. Paste that file into a Claude session
+to get it unstuck.
 
-## Which roles need a strong model
+Without `ANTHROPIC_API_KEY` set, everything runs local: the director never runs, so the
+swarm works through the existing Now list and then idles until someone fills it.
 
-Honest answer: the director, the stranger and the critic. A 7B model can write a small file
-when told exactly what to write. It cannot read a goal and decide what matters, and it cannot
-notice what a builder got wrong. Cycle one proved it. Set these before a cycle:
+## The local model
+
+A 7B model writes a small file when told exactly what to write, and nothing more. In cycle
+two it described the work instead of doing it. A 14B model follows Aider's edit format far
+better. On an 8 GB card it splits between the GPU and system RAM: slower per token, but the
+swarm never stops, so speed matters less than getting it right.
 ```
-$env:ANTHROPIC_API_KEY = "your key"
-$env:DIRECTOR_MODEL = "claude-opus-5-5"
-$env:STRANGER_MODEL = "claude-opus-5-5"
-$env:CRITIC_MODEL = "claude-opus-5-5"
+llama serve -hf bartowski/Qwen2.5-Coder-14B-Instruct-GGUF:Q4_K_M --port 8080 -c 16384 -np 1 -ngl 20
 ```
-Each of those roles makes one call per cycle, so a cycle costs well under a dollar. The
-builder stays on your GPU and does the long work for free. Leave the variables unset and
-every role runs on the local model.
+`-ngl 20` puts 20 layers on the GPU and the rest on the CPU. If it runs out of GPU memory,
+lower it. Check Hugging Face for a newer 14B coding model at the time.
 
 ## The locks
 
 - The builder works on a throwaway branch. It never sees main.
-- The critic runs in ask mode. It cannot edit a file.
+- The critic runs in ask mode. It cannot edit a file. The fixer cannot edit tests.
 - The guard: if the builder touches requirements, the bible, the workflow, the swarm, the
   prompts or the ledger, the branch goes to review no matter what.
 - Only a branch with passing tests, a clean critic and a clean guard goes to `build/`, and
@@ -49,9 +53,9 @@ every role runs on the local model.
    ```
    It probes for CUDA, ROCm and Vulkan and picks the right build for your GPU.
 2. **Start the model server** in its own PowerShell window and leave it running. It downloads
-   the model from Hugging Face the first time (about 4.7 GB):
+   the model from Hugging Face the first time (about 9 GB):
    ```
-   llama serve -hf bartowski/Qwen2.5-Coder-7B-Instruct-GGUF:Q4_K_M --port 8080
+   llama serve -hf bartowski/Qwen2.5-Coder-14B-Instruct-GGUF:Q4_K_M --port 8080 -c 16384 -np 1 -ngl 20
    ```
    Open http://127.0.0.1:8080 and send a message. If Task Manager's GPU graph jumps, the GPU
    is doing the work. Check Hugging Face for a newer 7B coding model at the time; any GGUF
@@ -64,25 +68,17 @@ every role runs on the local model.
    Close and reopen PowerShell, then `aider --version` should print a version.
 4. **Install the test tools** in the repo folder: `python -m pip install -r requirements-dev.txt`.
 5. **Make sure `git push` works** from this PC without a password prompt.
-6. **Run one cycle** from PowerShell in the repo folder (Git for Windows provides bash):
+6. **Set the key** for the rare Claude calls, in the same PowerShell window:
    ```
-   & "C:\Program Files\Git\bin\bash.exe" swarm/run.sh
+   $env:ANTHROPIC_API_KEY = "your key"
    ```
-   Warnings about the console or prompt toolkit are harmless.
-
-A 7B model handles small, clear tasks and struggles with vague ones. Keep `docs/NEXT.md`
-items tight. That matters more than any other setting.
-
-## Run it nightly
-
-Windows: open Task Scheduler, create a basic task, daily at 2 AM, action "Start a program":
-program `C:\Program Files\Git\bin\bash.exe`, arguments `C:\path\to\orbit\swarm\run.sh`.
-The model server from step 2 must be running.
-
-Mac or Linux: `crontab -e` and add
-```
-0 2 * * * /full/path/to/orbit/swarm/run.sh >> /full/path/to/orbit/workspace/runs/cron.log 2>&1
-```
+7. **Start the swarm** from PowerShell in the repo folder (Git for Windows provides bash):
+   ```
+   & "C:\Program Files\Git\bin\bash.exe" swarm/forever.sh
+   ```
+   It runs until you create a file named `swarm/STOP` (from another window: `New-Item swarm/STOP`).
+   Its log is `workspace/runs/forever.log`, one file per cycle beside it. Warnings about the
+   console or prompt toolkit are harmless. For a single cycle, run `swarm/run.sh` instead.
 
 ## What happens to a branch
 

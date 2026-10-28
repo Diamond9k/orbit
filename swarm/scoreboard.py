@@ -8,6 +8,9 @@ import os
 import sqlite3
 import sys
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 def read(db_path: str) -> dict:
     if not os.path.exists(db_path):
