@@ -57,3 +57,4 @@ Each item is small on purpose: the builder is a 7B model. One file, one test, on
 - Remove a listed machine. Nav never wraps.
 - Branches merge themselves when green (rule 12, GitHub workflow). Swarm set up for
   llama.cpp Vulkan on the RX 580.
+- Starting a second session sends you to the running one and now says why on that page.
