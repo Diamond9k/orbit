@@ -53,7 +53,8 @@ Payments run through Stripe (website), Stripe Connect (host payouts) and Apple i
 - GPUs are sorted into three tiers by memory: **Basic**, **Pro** and **Max**. The helper detects the tier;
   hosts never type it.
 - Each tier has a set rent (credits per hour) and a set host wage (dollars per hour). Hosts don't set prices.
-- Hosts only earn for minutes a rental is actually running. Failed rentals refund automatically.
+- Hosts only earn for minutes a rental is actually running. A rental that fails while loading, or in its
+  first 2 minutes, refunds in full automatically.
 - Every credit movement is recorded twice (double-entry), so the books always balance.
 
 Prices are not decided yet. Until they are, the site shows "set at launch". Full details:

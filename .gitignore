@@ -1,0 +1,54 @@
+# Secrets: never commit these (CLAUDE.md rule 5)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p8
+*.p12
+*.mobileprovision
+credentials*.json
+token.json
+
+# Dependencies
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.turbo/
+.vercel/
+
+# Expo (apps/mobile)
+.expo/
+.expo-shared/
+web-build/
+ios/Pods/
+
+# Tauri and Rust (apps/helper)
+target/
+src-tauri/gen/
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# Playwright and test output
+playwright-report/
+test-results/
+
+# Agent workspace: machine-local files
+workspace/ORBIT/local/
+
+# Claude Code local overrides
+.claude/settings.local.json
+
+# Logs and OS files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

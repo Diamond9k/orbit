@@ -2,11 +2,11 @@
 
 Same format as Arc OS docs/GATES.md. Update this file when a gate closes, with the evidence.
 
-Last checked 2026-10-26.
+Last checked 2026-10-28.
 
 | Gate | What is owed | Owner | Lights up | State |
 | --- | --- | --- | --- | --- |
-| G1 | Licence for the public repo (proposal: Apache-2.0) | Cooper | Public repo, ADR 0005 | Open |
+| G1 | Licence for the public repo (proposal: Apache-2.0) | Cooper | Public repo, ADR 0005 | Closed 2026-10-28. Apache-2.0 `LICENSE` is on `main` (commit c743c20). ADR 0005 is still to be written in V1 |
 | G2 | Domain bought and pointed at the Vercel project | Cooper | Live URL, email sender, Discord vanity link | Open. The landing page uses hello@orbit.app as a placeholder; not checked or owned |
 | G3 | Discord server created, invite link set as `DISCORD_INVITE` | Cooper | Discord pill, community links | Open |
 | G4 | Stripe account; test keys in Vercel (V2), live keys and Connect (V3) | Cooper | Credits purchase, host payouts | Open |

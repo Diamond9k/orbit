@@ -1,11 +1,13 @@
 # Kickoff: paste this into Claude Code on the Windows PC
 
-Before pasting: unzip this kit into an empty folder named `orbit` in your projects folder, open a
-terminal there, and start Claude Code with Fable 5.1 and Ultracode on.
+Before pasting: clone the repo into your projects folder with
+`git clone https://github.com/Diamond9k/orbit`, open a terminal in the new `orbit` folder, and start
+Claude Code with Fable 5.1 and Ultracode on.
 
 ---
 
-You are building Orbit from an empty repo. Everything you need is in this folder.
+You are building Orbit from a repo that holds only the plan so far. Everything you need is in this folder.
+Work on a branch; `main` is protected and Cooper merges.
 
 Read, in this order, before doing anything: `CLAUDE.md`, `docs/PLAN.md`, `docs/SCORECARD.md`,
 `docs/GAUNTLET.md`, `docs/SCAN-locallyuncensored.md`, `docs/GATES.md`.
@@ -17,8 +19,8 @@ How to run it:
 - Copy the operating pieces PLAN.md section 1 names from the Arc-OS repo (github.com/Diamond9k/Arc-OS):
   CI workflow, biome.json, tsconfig.json, recall.mjs and its lib, run-record.mjs, the PR template.
   Rename ARC to ORBIT. Copy nothing else from Arc: no keys, memory, skills or data.
-- Anything that needs my account (creating the GitHub repo, the Vercel project, the Supabase project,
-  branch protection, the Discord server, buying anything): stop, ask me with a popup, and wait.
+- Anything that needs my account (the Vercel project, the Supabase project, the Discord server,
+  buying anything): stop, ask me with a popup, and wait.
 - Step 8 before step 9: lock your V1 score predictions in a file before you build.
 - Run the gauntlet in docs/GAUNTLET.md with fresh subagents as critics. You build; you never grade
   your own work. Max 4 rounds. Fix only what failed each round.
