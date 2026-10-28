@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Session · Orbit{% endblock %}
+{% block body %}
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+  <div>
+    <div class="kicker">Session</div>
+    <h1 class="h3 mb-1">{{ s.model }}</h1>
+    <div class="text-secondary">On <strong class="text-body">{{ s.host_name }}</strong> · {{ s.gpu }} · {{ s.vram_gb }} GB · {{ s.price_cents_per_hour | dollars }} an hour</div>
+  </div>
+  {% if s.ended_at %}<span class="badge text-bg-secondary fs-6">ended</span>{% else %}<span class="badge text-bg-success fs-6">running</span>{% endif %}
+</div>
+
+{% if s.ended_at %}
+<div class="card mb-3"><div class="card-body">
+  <div class="row g-3">
+    <div class="col-sm-4"><div class="text-secondary small">Minutes used</div><div class="stat-n">{{ s.minutes }}</div></div>
+    <div class="col-sm-4"><div class="text-secondary small">You paid</div><div class="stat-n">{{ s.cost_cents | dollars }}</div></div>
+    <div class="col-sm-4"><div class="text-secondary small">Left</div><div class="stat-n">{{ balance | dollars }}</div></div>
+  </div>
+</div></div>
+<div class="d-flex gap-2"><a class="btn btn-primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="btn btn-outline-light" href="/account">Account</a></div>
+{% else %}
+<div class="card mb-3"><div class="card-body">
+  <div class="row g-3">
+    <div class="col-sm-4"><div class="text-secondary small">Running for</div><div class="stat-n" id="elapsed">0:00</div></div>
+    <div class="col-sm-4"><div class="text-secondary small">Cost so far</div><div class="stat-n" id="cost">$0.00</div></div>
+    <div class="col-sm-4"><div class="text-secondary small">Time left</div><div class="stat-n" id="left">{{ minutes_left }} min</div></div>
+  </div>
+</div></div>
+<script>
+(function () {
+  var started = {{ started_epoch }} * 1000, rate = {{ s.price_cents_per_hour }}, balance = {{ balance }};
+  function tick() {
+    var secs = Math.max(0, Math.floor((Date.now() - started) / 1000));
+    var mins = Math.max(1, Math.ceil(secs / 60));
+    var cost = Math.ceil(rate * mins / 60);
+    var left = Math.max(0, Math.floor((balance - cost) * 60 / rate));
+    document.getElementById('elapsed').textContent = Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2);
+    document.getElementById('cost').textContent = '$' + (cost / 100).toFixed(2);
+    document.getElementById('left').textContent = left + ' min';
+  }
+  tick(); setInterval(tick, 1000);
+})();
+</script>
+<div class="chat-placeholder">
+  <div><i class="bi bi-chat-dots fs-1 d-block mb-2"></i>The chat connects here once the host program is running on this machine.</div>
+</div>
+<form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
+{% endif %}
+{% endblock %}

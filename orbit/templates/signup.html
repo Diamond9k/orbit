@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Get started · Orbit{% endblock %}
+{% block body %}
+<div class="row justify-content-center"><div class="col-md-6 col-lg-5">
+  <div class="card mt-4"><div class="card-body p-4">
+    <h1 class="h3 mb-1">Get started</h1>
+    <p class="text-secondary">An email and a password. Nothing else.</p>
+    {% if error %}<div class="alert alert-danger py-2">{{ error }}</div>{% endif %}
+    <form method="post" action="/signup">
+      <div class="mb-3"><label class="form-label" for="email">Email</label><input class="form-control form-control-lg" id="email" type="email" name="email" required autocomplete="email"></div>
+      <div class="mb-3"><label class="form-label" for="password">Password</label><input class="form-control form-control-lg" id="password" type="password" name="password" required minlength="8" autocomplete="new-password"><div class="form-text">At least 8 characters.</div></div>
+      <button class="btn btn-primary btn-lg w-100">Create account</button>
+    </form>
+    <p class="text-secondary text-center mt-3 mb-0">Already have one? <a href="/login">Sign in</a></p>
+  </div></div>
+</div></div>
+{% endblock %}

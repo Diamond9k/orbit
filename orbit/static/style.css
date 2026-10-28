@@ -1,0 +1,29 @@
+/* Orbit overrides on top of Bootstrap 5. Keep this file small. */
+:root, [data-bs-theme=dark] {
+  --bs-body-font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bs-primary: #5d8dff; --bs-primary-rgb: 93, 141, 255;
+  --bs-link-color: #8ab4ff; --bs-link-color-rgb: 138, 180, 255; --bs-link-hover-color: #a9c6ff;
+  --bs-body-bg: #0b0d14; --bs-body-color: #e8ebf3;
+  --bs-secondary-color: #8b93aa; --bs-tertiary-bg: #141827; --bs-border-color: #232a3f;
+}
+[data-bs-theme=dark] .btn-primary { --bs-btn-bg: #5d8dff; --bs-btn-border-color: #5d8dff; --bs-btn-hover-bg: #4a7bf0; --bs-btn-hover-border-color: #4a7bf0; --bs-btn-color: #071024; --bs-btn-hover-color: #071024; }
+[data-bs-theme=dark] .btn-outline-light { --bs-btn-border-color: #2f3754; }
+[data-bs-theme=dark] .card { --bs-card-bg: #121626; --bs-card-border-color: #232a3f; }
+[data-bs-theme=dark] .navbar { background: rgba(11,13,20,.85) !important; backdrop-filter: blur(12px); border-bottom: 1px solid #1c2236; }
+[data-bs-theme=dark] .form-control { background: #0f1220; border-color: #2a324a; }
+[data-bs-theme=dark] .form-control:focus { border-color: #5d8dff; box-shadow: 0 0 0 .25rem rgba(93,141,255,.25); }
+[data-bs-theme=dark] .table { --bs-table-bg: transparent; }
+
+h1, h2, h3, .display-5, .display-4 { letter-spacing: -.02em; }
+.display-4 { font-weight: 800; }
+.hero { padding: 4.5rem 0 2.5rem; }
+.hero .lead { max-width: 36rem; }
+.demo-card { box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.demo-card .list-group-item { background: transparent; }
+.step-num { width: 2rem; height: 2rem; display: inline-grid; place-items: center; border-radius: 50%; background: var(--bs-primary); color: #071024; font-weight: 800; font-size: .9rem; }
+.stat-n { font-size: 2.2rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.price-n { font-size: 1.6rem; font-weight: 800; }
+.chat-placeholder { min-height: 280px; border: 1px dashed var(--bs-border-color); border-radius: .75rem; display: grid; place-items: center; text-align: center; color: var(--bs-secondary-color); padding: 2rem; }
+.kicker { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--bs-primary); }
+.card.pad { padding: .5rem; }
+footer { border-top: 1px solid var(--bs-border-color); }
