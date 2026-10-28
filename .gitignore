@@ -8,3 +8,6 @@ __pycache__/
 .env
 .env.*
 .venv/
+.aider*
+workspace/runs/*
+!workspace/runs/.gitkeep

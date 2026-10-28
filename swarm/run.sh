@@ -35,6 +35,14 @@ if [ -n "$(git status --porcelain)" ]; then
   git add -A && git commit -q -m "swarm: leftover changes from $STAMP"
 fi
 
+# Files the builder must never change. Touching one sends the branch to review/.
+PROTECTED='^(requirements.*\.txt|CLAUDE\.md|\.github/|swarm/|prompts/|\.aider\.conf\.yml|orbit/ledger\.py)'
+if git diff --name-only "origin/$BASE"..HEAD | grep -Eq "$PROTECTED"; then
+  GUARD=tripped; echo "Builder changed a protected file: $(git diff --name-only "origin/$BASE"..HEAD | grep -E "$PROTECTED" | tr '\n' ' ')" | tee -a "$RUN"
+else
+  GUARD=ok
+fi
+
 echo -e "\n## Tests\n" >> "$RUN"
 if python -m pytest -q 2>&1 | tee -a "$RUN"; then TESTS=pass; else TESTS=fail; fi
 
@@ -51,13 +59,13 @@ if echo "$CRITIC_OUT" | grep -qi "nothing found"; then CRITIC=clean; else CRITIC
 #   review/  anything else                -> waits for a fix, never merges on its own
 if [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$BASE")" ]; then
   echo "Builder made no commits. Nothing pushed." >> "$RUN"
-elif [ "$TESTS" = pass ] && [ "$CRITIC" = clean ]; then
+elif [ "$TESTS" = pass ] && [ "$CRITIC" = clean ] && [ "$GUARD" = ok ]; then
   git push -q -u origin "$BRANCH" && echo "Pushed $BRANCH. It merges itself when GitHub tests are green." >> "$RUN"
 else
   REVIEW="review/$STAMP"
   git branch -m "$BRANCH" "$REVIEW"; BRANCH="$REVIEW"
-  git push -q -u origin "$BRANCH" && echo "Pushed $BRANCH for review. Tests: $TESTS. Critic: $CRITIC." >> "$RUN"
+  git push -q -u origin "$BRANCH" && echo "Pushed $BRANCH for review. Tests: $TESTS. Critic: $CRITIC. Guard: $GUARD." >> "$RUN"
 fi
 
-{ echo -e "\n## Result"; echo "Tests: $TESTS"; echo "Critic: $CRITIC"; echo "Branch: $BRANCH"; } >> "$RUN"
+{ echo -e "\n## Result"; echo "Tests: $TESTS"; echo "Critic: $CRITIC"; echo "Guard: $GUARD"; echo "Branch: $BRANCH"; } >> "$RUN"
 echo "Run written to $RUN"
