@@ -12,7 +12,7 @@ one cycle at a time. The bible (CLAUDE.md), the tests and your merge are the loc
 | `prompts/builder.md` | What the builder is told |
 | `prompts/critic.md` | What the critic is told |
 | `.aider.conf.yml` | Model name, auto test, files always loaded |
-| `swarm/run.sh` | One cycle: fresh branch, build, test, push only if green, critique |
+| `swarm/run.sh` | One cycle: fresh branch, build, test, critique, push to build/ or review/ |
 | `workspace/runs/` | One file per cycle. Read these in the morning |
 
 ## The locks
@@ -52,14 +52,25 @@ line with `crontab -e`, using your real path:
 ```
 On Windows, use Task Scheduler to run `swarm/run.sh` through Git Bash.
 
+## What happens to a branch
+
+- Tests pass and critic says "Nothing found": pushed as `build/<date>`. GitHub runs the tests
+  again, opens a pull request, and merges it. Nobody clicks anything.
+- Anything else: pushed as `review/<date>`. It waits. Nothing merges on its own.
+
+## Once in GitHub settings
+
+Settings, General: tick "Allow auto-merge". Settings, Branches: protect `main` and require
+the "tests" check. That is what makes `build/` branches merge themselves.
+
 ## Each morning
 
 Open the newest file in `workspace/runs/`. Three outcomes:
 
-- **Critic says "Nothing found".** Open a pull request from the branch, read the diff yourself,
-  merge.
-- **Critic lists problems.** Paste the list into the top of `docs/NEXT.md` as the next item.
-  The next cycle fixes it.
+- **Merged itself.** Nothing to do. Glance at the diff on GitHub if you like. Revert if it
+  smells wrong.
+- **Went to review/.** The critic's list is in the run file. Paste it into the top of
+  `docs/NEXT.md` as the next item. The next cycle fixes it.
 - **Builder got stuck or wandered.** The item was too vague. Rewrite it in `docs/NEXT.md` in
   smaller, plainer words. That is the fix, not a bigger model.
 

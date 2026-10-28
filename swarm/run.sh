@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# One swarm cycle: builder builds on a throwaway branch, tests run, branch is pushed only if
-# tests pass, critic reviews in ask mode. Nothing here touches main.
+# One swarm cycle: builder builds on a throwaway branch, tests run, critic reviews in ask
+# mode. Green and clean goes to build/ and merges itself on GitHub. Anything else goes to
+# review/ and waits. Nothing here touches main directly.
 # Needs: git, python3, aider, and Ollama running on this PC.
 #
 #   swarm/run.sh                 one cycle from main
@@ -34,16 +35,22 @@ fi
 echo -e "\n## Tests\n" >> "$RUN"
 if python3 -m pytest -q 2>&1 | tee -a "$RUN"; then TESTS=pass; else TESTS=fail; fi
 
-if [ "$TESTS" = pass ] && [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$BASE")" ]; then
-  git push -q -u origin "$BRANCH" && echo "Pushed $BRANCH" >> "$RUN"
-elif [ "$TESTS" = fail ]; then
-  echo "Tests failed. Branch kept locally, nothing pushed." >> "$RUN"
-else
+echo -e "\n## Critic\n" >> "$RUN"
+CRITIC_OUT="$(aider --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
+if echo "$CRITIC_OUT" | grep -qi "nothing found"; then CRITIC=clean; else CRITIC=flagged; fi
+
+# Where the branch goes decides what happens to it:
+#   build/   tests pass and critic clean  -> GitHub runs tests again and merges it
+#   review/  anything else                -> waits for a fix, never merges on its own
+if [ "$(git rev-parse HEAD)" = "$(git rev-parse "origin/$BASE")" ]; then
   echo "Builder made no commits. Nothing pushed." >> "$RUN"
+elif [ "$TESTS" = pass ] && [ "$CRITIC" = clean ]; then
+  git push -q -u origin "$BRANCH" && echo "Pushed $BRANCH. It merges itself when GitHub tests are green." >> "$RUN"
+else
+  REVIEW="review/$STAMP"
+  git branch -m "$BRANCH" "$REVIEW"; BRANCH="$REVIEW"
+  git push -q -u origin "$BRANCH" && echo "Pushed $BRANCH for review. Tests: $TESTS. Critic: $CRITIC." >> "$RUN"
 fi
 
-echo -e "\n## Critic\n" >> "$RUN"
-aider --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN"
-
-{ echo -e "\n## Result"; echo "Tests: $TESTS"; echo "Branch: $BRANCH"; } >> "$RUN"
+{ echo -e "\n## Result"; echo "Tests: $TESTS"; echo "Critic: $CRITIC"; echo "Branch: $BRANCH"; } >> "$RUN"
 echo "Run written to $RUN"
