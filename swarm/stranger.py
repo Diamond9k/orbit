@@ -10,6 +10,9 @@ import html
 import os
 import re
 import sys
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import tempfile
 
 os.environ.setdefault("ORBIT_DEV", "1")

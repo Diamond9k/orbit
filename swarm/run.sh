@@ -22,6 +22,7 @@ STAMP="$(date +%Y-%m-%d-%H%M)"
 BRANCH="build/$STAMP"
 RUN="workspace/runs/$STAMP.md"
 PY="${PYTHON:-python}"
+export PYTHONIOENCODING=utf-8 PYTHONUTF8=1
 
 if ! curl -s -o /dev/null http://127.0.0.1:8080/v1/models; then
   echo "No model server on port 8080. Start llama-server first (docs/SWARM.md)." >&2; exit 1
