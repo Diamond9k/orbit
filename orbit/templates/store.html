@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Add time · Orbit{% endblock %}
+{% block body %}
+<section class="narrow">
+  <h1>Add hardware time</h1>
+  <p>You have <strong>{{ balance | dollars }}</strong>.
+  {% if cheapest %}The cheapest machine online right now is {{ cheapest | dollars }} an hour.{% else %}No machines are online right now.{% endif %}</p>
+
+  {% if stripe_ready %}
+  <div class="choices">
+    {% for a in amounts %}
+    <form method="post" action="/store/checkout">
+      <input type="hidden" name="amount_cents" value="{{ a }}">
+      <button class="button big">{{ a | dollars }}</button>
+      {% if cheapest %}<span class="muted">about {{ (a * 60 // cheapest) }} minutes on the cheapest machine</span>{% endif %}
+    </form>
+    {% endfor %}
+  </div>
+  <p class="muted">Paid by card through Stripe. Hardware time does not expire and is not refundable.</p>
+  {% else %}
+  <p class="error">Card payments are not set up yet.</p>
+  {% endif %}
+
+  {% if dev %}
+  <h2>Test funds</h2>
+  <form method="post" action="/store/dev-funds">
+    <input type="hidden" name="amount_cents" value="1000">
+    <button class="button ghost">Add $10.00 of test funds</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

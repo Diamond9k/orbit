@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Hosts · Orbit{% endblock %}
+{% block body %}
+<section>
+  <h1>Machines</h1>
+  {% if hosts %}
+  <table>
+    <tr><th>Name</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Status</th></tr>
+    {% for h in hosts %}
+    <tr><td>{{ h.name }}</td><td>{{ h.gpu }}</td><td>{{ h.vram_gb }} GB</td>
+        <td>{{ h.price_cents_per_hour | dollars }}</td><td class="status-{{ h.status }}">{{ h.status }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">No machines listed yet.</p>{% endif %}
+</section>
+
+<section class="narrow">
+  <h2>List your machine</h2>
+  <p>You are paid for every hour it is used. Nothing for listing it.</p>
+  {% if new_token %}
+  <p class="notice">Listed. Your host token is below. The host program (step 2) uses it to connect. Keep it private.</p>
+  <pre>{{ new_token }}</pre>
+  {% endif %}
+  {% if user %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/hosts">
+    <label>Name <input name="name" required placeholder="e.g. Cooper's desktop"></label>
+    <label>GPU <input name="gpu" required placeholder="e.g. RTX 4090"></label>
+    <label>GPU memory (GB) <input name="vram_gb" type="number" step="0.5" min="1" required></label>
+    <label>Price per hour (dollars) <input name="price_dollars_per_hour" type="number" step="0.05" min="0.05" required></label>
+    <button class="button">List it</button>
+  </form>
+  {% else %}
+  <p><a class="button" href="/signup">Get started</a> to list a machine.</p>
+  {% endif %}
+</section>
+{% endblock %}

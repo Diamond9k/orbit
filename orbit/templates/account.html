@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Account · Orbit{% endblock %}
+{% block body %}
+<section>
+  <h1>Your account</h1>
+  <p class="big-number">{{ balance | dollars }} <span class="muted">of hardware time</span></p>
+  <p><a class="button" href="/store">Add time</a> <a class="button ghost" href="/run">Run a model</a></p>
+</section>
+
+<section>
+  <h2>Sessions</h2>
+  {% if sessions %}
+  <table>
+    <tr><th>Model</th><th>Machine</th><th>Started</th><th>Minutes</th><th>Cost</th><th></th></tr>
+    {% for s in sessions %}
+    <tr>
+      <td>{{ s.model }}</td><td>{{ s.host_name }}</td><td>{{ s.started_at }}</td>
+      <td>{{ s.minutes if s.minutes is not none else "running" }}</td>
+      <td>{{ s.cost_cents | dollars if s.cost_cents is not none else "" }}</td>
+      <td><a href="/sessions/{{ s.id }}">open</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">No sessions yet.</p>{% endif %}
+</section>
+
+{% if hosts %}
+<section>
+  <h2>Your machines</h2>
+  <table>
+    <tr><th>Name</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Status</th><th>Earned</th></tr>
+    {% for h in hosts %}
+    <tr><td>{{ h.name }}</td><td>{{ h.gpu }}</td><td>{{ h.vram_gb }} GB</td>
+        <td>{{ h.price_cents_per_hour | dollars }}</td><td>{{ h.status }}</td>
+        <td>{{ host_earned[h.id] | dollars }}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+
+<section>
+  <h2>Ledger</h2>
+  {% if history %}
+  <table>
+    <tr><th>When</th><th>What</th><th>Amount</th></tr>
+    {% for r in history %}
+    <tr><td>{{ r.created_at }}</td><td>{{ r.memo }}</td>
+        <td class="{{ 'pos' if r.amount_cents > 0 else 'neg' }}">{{ r.amount_cents | dollars }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<p class="muted">Nothing yet.</p>{% endif %}
+</section>
+{% endblock %}

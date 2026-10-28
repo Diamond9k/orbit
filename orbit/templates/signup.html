@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Get started · Orbit{% endblock %}
+{% block body %}
+<section class="narrow">
+  <h1>Get started</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <form method="post" action="/signup">
+    <label>Email <input type="email" name="email" required autocomplete="email"></label>
+    <label>Password <input type="password" name="password" required minlength="8" autocomplete="new-password"></label>
+    <button class="button">Create account</button>
+  </form>
+  <p class="muted">Already have one? <a href="/login">Sign in</a></p>
+</section>
+{% endblock %}

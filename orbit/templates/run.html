@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Run a model · Orbit{% endblock %}
+{% block body %}
+<section>
+  <h1>Run a model</h1>
+  {% if active %}
+  <p class="notice">You have a session running on {{ active.host_name }}. <a href="/sessions/{{ active.id }}">Open it</a>.</p>
+  {% endif %}
+  <form method="get" action="/run" class="row">
+    <input type="text" name="model" value="{{ model }}" placeholder="Hugging Face model, e.g. bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M" size="60" required>
+    <button class="button">Check fit</button>
+  </form>
+  <p class="muted">Orbit reads the size and quantization from the name. If the name does not say, Orbit says "unknown" rather than guess.</p>
+</section>
+
+{% if model %}
+<section>
+  <h2>Machines for <code>{{ model }}</code></h2>
+  {% if results %}
+  <table>
+    <tr><th>Machine</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Fit</th><th></th></tr>
+    {% for h, f in results %}
+    <tr>
+      <td>{{ h.name }}</td><td>{{ h.gpu }}</td><td>{{ h.vram_gb }} GB</td><td>{{ h.price_cents_per_hour | dollars }}</td>
+      <td class="fit-{{ f.verdict }}"><strong>{{ f.verdict.replace('_', ' ') }}</strong><br><span class="muted">{{ f.reason }}</span></td>
+      <td>
+        {% if f.verdict != 'too_big' %}
+          {% if user %}
+            {% if active %}
+              <span class="muted">session running</span>
+            {% elif balance >= h.price_cents_per_hour %}
+            <form method="post" action="/sessions/start">
+              <input type="hidden" name="model" value="{{ model }}">
+              <input type="hidden" name="host_id" value="{{ h.id }}">
+              <button class="button">Start</button>
+            </form>
+            {% else %}
+            <a class="button ghost" href="/store">Add time</a>
+            {% endif %}
+          {% else %}
+          <a class="button ghost" href="/signup">Get started</a>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">No machines are online right now.</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="hero">
+  <h1>Run open source models.<br>Pay only for the hardware.<br>No API credits.</h1>
+  <p>Pick any model on Hugging Face. Orbit finds one machine that fits it and gives it to you alone for as long as you need. A guide sits with you from the first second.</p>
+  <p class="actions">
+    <a class="button big" href="/signup">Get started</a>
+    <a class="button big ghost" href="/run">See what fits</a>
+  </p>
+  <p class="muted">Machines online right now: {{ hosts_online }}</p>
+</section>
+
+<section class="three">
+  <div><h3>One machine, yours</h3><p>No sharing. The whole GPU is yours until you stop.</p></div>
+  <div><h3>Any open model</h3><p>Type a Hugging Face model name. Orbit tells you if it fits, honestly.</p></div>
+  <div><h3>Hardware time, not tokens</h3><p>You pay by the hour for a machine. Not per word, not per request.</p></div>
+</section>
+
+<section class="host-cta">
+  <h2>Have an idle GPU?</h2>
+  <p>List it. You are paid for every hour someone uses it, and nothing when they don't.</p>
+  <a class="button" href="/hosts">List your machine</a>
+</section>
+{% endblock %}

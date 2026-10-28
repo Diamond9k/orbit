@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Orbit{% endblock %}</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/">Orbit</a>
+  <nav>
+    <a href="/run">Run a model</a>
+    <a href="/hosts">Hosts</a>
+    {% if user %}
+      <a href="/store">Add time</a>
+      <a href="/account">{{ user.email }}</a>
+      <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>
+    {% else %}
+      <a href="/login">Sign in</a>
+      <a href="/signup" class="button">Get started</a>
+    {% endif %}
+  </nav>
+</header>
+<main>
+{% block body %}{% endblock %}
+</main>
+<footer>
+  <p>Orbit holds a list of machines and a ledger. Your model and your conversation run on the host, never here.</p>
+  {% if dev %}<p class="dev">Development mode is on. Test funds are enabled.</p>{% endif %}
+</footer>
+</body>
+</html>

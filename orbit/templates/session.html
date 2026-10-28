@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Session · Orbit{% endblock %}
+{% block body %}
+<section>
+  <h1>{{ s.model }}</h1>
+  <p>On <strong>{{ s.host_name }}</strong> ({{ s.gpu }}, {{ s.vram_gb }} GB) at {{ s.price_cents_per_hour | dollars }} an hour.</p>
+
+  {% if s.ended_at %}
+  <p class="notice">Ended. You used {{ s.minutes }} minute{{ 's' if s.minutes != 1 }} and paid {{ s.cost_cents | dollars }}.</p>
+  <p><a class="button" href="/run?model={{ s.model | urlencode }}">Run it again</a> <a class="button ghost" href="/account">Account</a></p>
+  {% else %}
+  <p class="notice">Running since {{ s.started_at }}. You have {{ balance | dollars }} left, about {{ minutes_left }} minutes at this price.</p>
+  <div class="chat-placeholder">
+    <p>The chat screen connects here once the host program (step 2) is running on this machine.</p>
+  </div>
+  <form method="post" action="/sessions/{{ s.id }}/stop">
+    <button class="button">Stop session</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}
