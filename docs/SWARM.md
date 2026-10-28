@@ -73,30 +73,6 @@ every role runs on the local model.
 A 7B model handles small, clear tasks and struggles with vague ones. Keep `docs/NEXT.md`
 items tight. That matters more than any other setting.
 
-## Run it all the time
-
-`swarm/loop.sh` runs cycle after cycle until you stop it. Before each cycle it waits for the
-previous `build/` branch to merge on GitHub, so the director never plans on top of work that
-has not landed. From PowerShell in the repo folder, with the key and model variables set:
-```
-& "C:\Program Files\Git\bin\bash.exe" swarm/loop.sh
-```
-To cap cost, pause between cycles: `$env:PAUSE = "1800"` (30 minutes) before the line above.
-To stop after the current cycle, create an empty file named `swarm/STOP` (from another
-window: `New-Item swarm/STOP`). The loop's own log is `workspace/runs/loop.log`.
-
-To start it with Windows: Task Scheduler, create a basic task, trigger "When I log on",
-action "Start a program", program `C:\Program Files\Git\bin\bash.exe`, arguments
-`C:\path\to\orbit\swarm\loop.sh`. The model server must also be running; add a second
-task for it with program `llama` and arguments
-`serve -hf bartowski/Qwen2.5-Coder-7B-Instruct-GGUF:Q4_K_M --port 8080`.
-Put the key and model variables in the user's environment variables (Windows settings,
-"Edit environment variables for your account") so scheduled tasks can see them.
-
-While the loop runs, the builder uses the same GPU that is listed as host number one. With
-no strangers yet that is fine. When strangers arrive, run the loop off-hours or on a second
-machine.
-
 ## What happens to a branch
 
 - Tests pass and critic says "Nothing found": pushed as `build/<date>`. GitHub runs the tests

@@ -11,4 +11,3 @@ __pycache__/
 .aider*
 workspace/runs/*
 !workspace/runs/.gitkeep
-swarm/STOP
