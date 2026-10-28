@@ -31,10 +31,18 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - run: |
           BRANCH="${GITHUB_REF#refs/heads/}"
+          # Title is what was built: the first line of the newest commit that isn't housekeeping.
+          TITLE="$(git log origin/main..HEAD --format=%s | grep -v '^swarm:' | head -1)"
+          TITLE="${TITLE:-$BRANCH}"
+          BODY="$(git log origin/main..HEAD --format='- %s')"
           if ! gh pr view "$BRANCH" >/dev/null 2>&1; then
-            gh pr create --base main --head "$BRANCH" --title "swarm: $BRANCH" \
-              --body "Built by the swarm. Tests passed. Critic found nothing. Merges itself when checks are green."
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" \
+              --body "Built by the swarm. Tests passed. Critic found nothing. Merges itself when checks are green.
+
+$BODY"
           fi
           gh pr merge "$BRANCH" --auto --squash
