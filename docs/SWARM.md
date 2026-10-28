@@ -1,26 +1,44 @@
 # The swarm
 
-Agents that build Orbit on your own PC with open source models. One builder, one critic,
-one cycle at a time. The bible (CLAUDE.md), the tests and your merge are the locks.
+Agents that build Orbit toward the goal in CLAUDE.md, on your own PC. Five roles, one cycle.
+The bible, the tests, the guard and your revert are the locks.
 
-## What runs where
+## The roles
 
-| Piece | What |
-|---|---|
-| llama.cpp (Vulkan build) | Runs the coding model on the GPU and serves it locally. Works on AMD cards like the RX 580 |
-| Aider | The agent. Reads the prompt, edits files, runs tests, commits |
-| `prompts/builder.md` | What the builder is told |
-| `prompts/critic.md` | What the critic is told |
-| `.aider.conf.yml` | Model name, auto test, files always loaded |
-| `swarm/run.sh` | One cycle: fresh branch, build, test, critique, push to build/ or review/ |
-| `workspace/runs/` | One file per cycle. Read these in the morning |
+| Role | What it does | File | Model |
+|---|---|---|---|
+| Scoreboard | Reads the ledger: hosts paid, sessions by strangers, hosts online | `swarm/scoreboard.py` | none |
+| Stranger | Walks Orbit like a first-time user, every screen, and reports where it got stuck | `swarm/stranger.py`, `prompts/stranger.md` | `STRANGER_MODEL` |
+| Director | Owns the goal. Reads the bible, scoreboard, stranger report and last result, then rewrites the Now section of `docs/NEXT.md` | `swarm/director.py`, `prompts/director.md` | `DIRECTOR_MODEL` |
+| Builder | Takes the director's top item on a throwaway branch | Aider, `prompts/builder.md`, `.aider.conf.yml` | local |
+| Critic | Reads the diff cold and lists what a stranger would hit | Aider in ask mode, `prompts/critic.md` | `CRITIC_MODEL` |
+
+`swarm/run.sh` runs them in that order, then the guard checks protected files and the branch
+goes to `build/` (merges itself on GitHub) or `review/` (waits). Logs land in `workspace/runs/`.
+
+## Which roles need a strong model
+
+Honest answer: the director, the stranger and the critic. A 7B model can write a small file
+when told exactly what to write. It cannot read a goal and decide what matters, and it cannot
+notice what a builder got wrong. Cycle one proved it. Set these before a cycle:
+```
+$env:ANTHROPIC_API_KEY = "your key"
+$env:DIRECTOR_MODEL = "claude-opus-5-5"
+$env:STRANGER_MODEL = "claude-opus-5-5"
+$env:CRITIC_MODEL = "claude-opus-5-5"
+```
+Each of those roles makes one call per cycle, so a cycle costs well under a dollar. The
+builder stays on your GPU and does the long work for free. Leave the variables unset and
+every role runs on the local model.
 
 ## The locks
 
 - The builder works on a throwaway branch. It never sees main.
 - The critic runs in ask mode. It cannot edit a file.
-- Only a branch with passing tests and a clean critic goes to `build/`, and GitHub runs the
-  tests again before it merges. Everything else goes to `review/` and waits.
+- The guard: if the builder touches requirements, the bible, the workflow, the swarm, the
+  prompts or the ledger, the branch goes to review no matter what.
+- Only a branch with passing tests, a clean critic and a clean guard goes to `build/`, and
+  GitHub runs the tests again before it merges. Everything else goes to `review/`.
 - Cooper can revert anything.
 
 ## Setup, once (Windows, tested on an AMD RX 580)
@@ -87,17 +105,6 @@ Open the newest file in `workspace/runs/`. Three outcomes:
   `docs/NEXT.md` as the next item. The next cycle fixes it.
 - **Builder got stuck or wandered.** The item was too vague. Rewrite it in `docs/NEXT.md` in
   smaller, plainer words. That is the fix, not a bigger model.
-
-## A stronger critic
-
-The critic is the best place to spend a little money: it reads one diff and writes a short
-list, so a cycle costs a few cents, and it catches what a 7B builder misses. In PowerShell,
-before running a cycle:
-```
-$env:ANTHROPIC_API_KEY = "your key"
-$env:CRITIC_MODEL = "claude-opus-5-5"
-```
-The builder stays on your GPU. Leave both unset and the critic runs locally.
 
 ## When to spend money
 
