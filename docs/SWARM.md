@@ -1,52 +1,74 @@
 # The swarm
 
-Agents that build Orbit on your own PC with open source models. One builder, one critic,
-one cycle at a time. The bible (CLAUDE.md), the tests and your merge are the locks.
+Agents that build Orbit toward the goal in CLAUDE.md, on your own PC. Five roles, one cycle.
+The bible, the tests, the guard and your revert are the locks.
 
-## What runs where
+## The roles
 
-| Piece | What |
-|---|---|
-| llama.cpp (Vulkan build) | Runs the coding model on the GPU and serves it locally. Works on AMD cards like the RX 580 |
-| Aider | The agent. Reads the prompt, edits files, runs tests, commits |
-| `prompts/builder.md` | What the builder is told |
-| `prompts/critic.md` | What the critic is told |
-| `.aider.conf.yml` | Model name, auto test, files always loaded |
-| `swarm/run.sh` | One cycle: fresh branch, build, test, critique, push to build/ or review/ |
-| `workspace/runs/` | One file per cycle. Read these in the morning |
+| Role | What it does | File | Model |
+|---|---|---|---|
+| Scoreboard | Reads the ledger: hosts paid, sessions by strangers, hosts online | `swarm/scoreboard.py` | none |
+| Stranger | Walks Orbit like a first-time user, every screen, and reports where it got stuck | `swarm/stranger.py`, `prompts/stranger.md` | `STRANGER_MODEL` |
+| Director | Owns the goal. Reads the bible, scoreboard, stranger report and last result, then rewrites the Now section of `docs/NEXT.md` | `swarm/director.py`, `prompts/director.md` | `DIRECTOR_MODEL` |
+| Builder | Takes the director's top item on a throwaway branch | Aider, `prompts/builder.md`, `.aider.conf.yml` | local |
+| Critic | Reads the diff cold and lists what a stranger would hit | Aider in ask mode, `prompts/critic.md` | `CRITIC_MODEL` |
+
+`swarm/run.sh` runs them in that order, then the guard checks protected files and the branch
+goes to `build/` (merges itself on GitHub) or `review/` (waits). Logs land in `workspace/runs/`.
+
+## Which roles need a strong model
+
+Honest answer: the director, the stranger and the critic. A 7B model can write a small file
+when told exactly what to write. It cannot read a goal and decide what matters, and it cannot
+notice what a builder got wrong. Cycle one proved it. Set these before a cycle:
+```
+$env:ANTHROPIC_API_KEY = "your key"
+$env:DIRECTOR_MODEL = "claude-opus-5-5"
+$env:STRANGER_MODEL = "claude-opus-5-5"
+$env:CRITIC_MODEL = "claude-opus-5-5"
+```
+Each of those roles makes one call per cycle, so a cycle costs well under a dollar. The
+builder stays on your GPU and does the long work for free. Leave the variables unset and
+every role runs on the local model.
 
 ## The locks
 
 - The builder works on a throwaway branch. It never sees main.
 - The critic runs in ask mode. It cannot edit a file.
-- Only a branch with passing tests and a clean critic goes to `build/`, and GitHub runs the
-  tests again before it merges. Everything else goes to `review/` and waits.
+- The guard: if the builder touches requirements, the bible, the workflow, the swarm, the
+  prompts or the ledger, the branch goes to review no matter what.
+- Only a branch with passing tests, a clean critic and a clean guard goes to `build/`, and
+  GitHub runs the tests again before it merges. Everything else goes to `review/`.
 - Cooper can revert anything.
 
-## Setup, once (Windows, AMD RX 580 or similar)
+## Setup, once (Windows, tested on an AMD RX 580)
 
-1. **Get llama.cpp.** From github.com/ggml-org/llama.cpp, Releases, download the Windows
-   Vulkan zip (its name contains `win-vulkan-x64`). Unzip it to `C:\llama`.
-2. **Get a coding model that fits 8 GB.** From Hugging Face, download
-   `Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf` (about 4.7 GB) into `C:\llama\models`.
-   Check Hugging Face for a newer 7B coding model at the time; any GGUF works.
-3. **Start the model server** in its own PowerShell window and leave it running:
+1. **Install llama.cpp** with its own installer. In PowerShell:
    ```
-   C:\llama\llama-server.exe -m C:\llama\models\Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf -ngl 99 -c 16384 --port 8080
+   irm https://llama.app/install.ps1 | iex
    ```
-   `-ngl 99` puts every layer on the GPU. If it fails to load, lower it to 24 and the rest
-   runs on the CPU, slower but fine overnight.
-4. **Install the tools** in another PowerShell window:
+   It probes for CUDA, ROCm and Vulkan and picks the right build for your GPU.
+2. **Start the model server** in its own PowerShell window and leave it running. It downloads
+   the model from Hugging Face the first time (about 4.7 GB):
    ```
-   python -m pip install aider-chat
-   python -m pip install -r requirements-dev.txt
+   llama serve -hf bartowski/Qwen2.5-Coder-7B-Instruct-GGUF:Q4_K_M --port 8080
    ```
+   Open http://127.0.0.1:8080 and send a message. If Task Manager's GPU graph jumps, the GPU
+   is doing the work. Check Hugging Face for a newer 7B coding model at the time; any GGUF
+   with a Q4_K_M file works.
+3. **Install Aider in its own environment**, so it never changes your other Python packages:
+   ```
+   python -m pip install aider-install
+   aider-install
+   ```
+   Close and reopen PowerShell, then `aider --version` should print a version.
+4. **Install the test tools** in the repo folder: `python -m pip install -r requirements-dev.txt`.
 5. **Make sure `git push` works** from this PC without a password prompt.
-6. **Try one cycle** from Git Bash (comes with Git for Windows):
+6. **Run one cycle** from PowerShell in the repo folder (Git for Windows provides bash):
    ```
-   BASE=claude/zen-ride-rbvl70 swarm/run.sh
+   & "C:\Program Files\Git\bin\bash.exe" swarm/run.sh
    ```
-   Once that branch is merged, drop the `BASE=` part and it builds from main.
+   Warnings about the console or prompt toolkit are harmless.
 
 A 7B model handles small, clear tasks and struggles with vague ones. Keep `docs/NEXT.md`
 items tight. That matters more than any other setting.
@@ -55,7 +77,7 @@ items tight. That matters more than any other setting.
 
 Windows: open Task Scheduler, create a basic task, daily at 2 AM, action "Start a program":
 program `C:\Program Files\Git\bin\bash.exe`, arguments `C:\path\to\orbit\swarm\run.sh`.
-The model server from step 3 must be running.
+The model server from step 2 must be running.
 
 Mac or Linux: `crontab -e` and add
 ```

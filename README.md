@@ -148,7 +148,7 @@ python3 -m pytest
 
 ## The swarm
 
-Agents build Orbit on your own PC with open source models. See `docs/SWARM.md`.
+Five agent roles build Orbit toward the goal in `CLAUDE.md`, on your own PC: scoreboard, stranger, director, builder, critic. See `docs/SWARM.md`.
 
 ## Contributing
 

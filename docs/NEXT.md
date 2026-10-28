@@ -6,10 +6,14 @@ Add anything else worth doing to Later, one line each. Do not reorder without Co
 ## Now
 Each item is small on purpose: the builder is a 7B model. One file, one test, one push.
 
-1. **Host program, step 1: say hello.** New file `host/orbit_host.py`. It reads a token from
-   `host/token.txt` and posts to `/api/hosts/heartbeat` every 60 seconds using only the
-   standard library (`urllib`). Prints "online" on success and the error on failure. Only ever
-   dials out. Test: a unit test that mocks the HTTP call.
+1. **Host program, step 1: say hello.** New file `host/orbit_host.py`, standard library only.
+   It reads a token from `host/token.txt`, then every 60 seconds sends an HTTP POST to
+   `http://localhost:8000/api/hosts/heartbeat` with form body `token=<token>` (see the
+   `heartbeat` route in `orbit/app.py`: it is POST and reads a form field named `token`).
+   Prints "online" when the reply is 200, otherwise prints the error. Only ever dials out.
+   New file `tests/test_host.py`: mock the token file read and mock `urllib.request.urlopen`;
+   assert the request is a POST to that URL with that body, and that a failure prints the error.
+   Do not touch any other file except `docs/NEXT.md`.
 2. **Host program, step 2: report real hardware.** On start, `orbit_host.py` detects GPU name
    and memory on Windows (`wmic path win32_VideoController get Name,AdapterRAM`), Linux
    (`lspci` or `nvidia-smi`) and Mac (`system_profiler`), and sends them with the heartbeat.
@@ -35,6 +39,8 @@ Each item is small on purpose: the builder is a 7B model. One file, one test, on
 9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly.
 
 ## Later
+- Cycle 1 (review/2026-10-28-1717) went to review: GET instead of POST, tests read a real
+  file, requirements.txt wiped. Branch can be deleted; item 1 stays on top.
 - Edit a listed machine's price without removing it.
 - Direct browser-to-host link with the relay as fallback, for speed.
 - Model fit read from the Hugging Face file list, not only the name.
