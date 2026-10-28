@@ -35,7 +35,6 @@ Each item is small on purpose: the builder is a 7B model. One file, one test, on
 9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly.
 
 ## Later
-- Favicon. The browser asks for one and gets a 404.
 - Edit a listed machine's price without removing it.
 - Direct browser-to-host link with the relay as fallback, for speed.
 - Model fit read from the Hugging Face file list, not only the name.
