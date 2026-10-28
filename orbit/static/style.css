@@ -27,3 +27,5 @@ h1, h2, h3, .display-5, .display-4 { letter-spacing: -.02em; }
 .kicker { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--bs-primary); }
 .card.pad { padding: .5rem; }
 footer { border-top: 1px solid var(--bs-border-color); }
+
+.navbar .nav-link, .navbar .btn, .navbar-brand { white-space: nowrap; }

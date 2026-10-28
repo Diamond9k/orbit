@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Account · Orbit{% endblock %}
 {% block body %}
+{% if flash %}<div class="alert alert-warning">{{ flash }}</div>{% endif %}
 <div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
   <div><h1 class="h2 mb-1">Your account</h1><div class="text-secondary">{{ user.email }}</div></div>
   <div class="d-flex gap-2"><a class="btn btn-primary" href="/store"><i class="bi bi-plus-circle me-1"></i>Add time</a><a class="btn btn-outline-light" href="/run">Run a model</a></div>
@@ -28,11 +29,12 @@
 {% if hosts %}
 <div class="card mb-4"><div class="card-header fw-semibold">Your machines</div>
   <div class="table-responsive"><table class="table mb-0 align-middle">
-    <thead><tr><th>Name</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Status</th><th class="text-end">Earned</th></tr></thead>
+    <thead><tr><th>Name</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Status</th><th class="text-end">Earned</th><th></th></tr></thead>
     <tbody>{% for h in hosts %}
     <tr><td class="fw-semibold">{{ h.name }}</td><td>{{ h.gpu }}</td><td>{{ h.vram_gb }} GB</td><td>{{ h.price_cents_per_hour | dollars }}</td>
         <td><span class="badge {{ 'text-bg-success' if h.status == 'online' else 'text-bg-warning' if h.status == 'busy' else 'text-bg-secondary' }}">{{ h.status }}</span></td>
-        <td class="text-end">{{ host_earned[h.id] | dollars }}</td></tr>
+        <td class="text-end">{{ host_earned[h.id] | dollars }}</td>
+        <td class="text-end"><form method="post" action="/hosts/{{ h.id }}/remove" onsubmit="return confirm('Remove {{ h.name }} from Orbit? You can list it again any time.')"><button class="btn btn-sm btn-outline-danger" {{ 'disabled' if h.status == 'busy' }}>Remove</button></form></td></tr>
     {% endfor %}</tbody></table></div>
 </div>
 {% endif %}
