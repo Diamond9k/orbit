@@ -1,21 +1,29 @@
 {% extends "base.html" %}
 {% block title %}Session · Orbit{% endblock %}
 {% block body %}
-<section>
-  <h1>{{ s.model }}</h1>
-  <p>On <strong>{{ s.host_name }}</strong> ({{ s.gpu }}, {{ s.vram_gb }} GB) at {{ s.price_cents_per_hour | dollars }} an hour.</p>
-
-  {% if s.ended_at %}
-  <p class="notice">Ended. You used {{ s.minutes }} minute{{ 's' if s.minutes != 1 }} and paid {{ s.cost_cents | dollars }}.</p>
-  <p><a class="button" href="/run?model={{ s.model | urlencode }}">Run it again</a> <a class="button ghost" href="/account">Account</a></p>
-  {% else %}
-  <p class="notice">Running since {{ s.started_at }}. You have {{ balance | dollars }} left, about {{ minutes_left }} minutes at this price.</p>
-  <div class="chat-placeholder">
-    <p>The chat screen connects here once the host program (step 2) is running on this machine.</p>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+  <div>
+    <div class="kicker">Session</div>
+    <h1 class="h3 mb-1">{{ s.model }}</h1>
+    <div class="text-secondary">On <strong class="text-body">{{ s.host_name }}</strong> · {{ s.gpu }} · {{ s.vram_gb }} GB · {{ s.price_cents_per_hour | dollars }} an hour</div>
   </div>
-  <form method="post" action="/sessions/{{ s.id }}/stop">
-    <button class="button">Stop session</button>
-  </form>
-  {% endif %}
-</section>
+  {% if s.ended_at %}<span class="badge text-bg-secondary fs-6">ended</span>{% else %}<span class="badge text-bg-success fs-6">running</span>{% endif %}
+</div>
+
+{% if s.ended_at %}
+<div class="card mb-3"><div class="card-body">
+  <div class="row g-3">
+    <div class="col-sm-4"><div class="text-secondary small">Minutes used</div><div class="stat-n">{{ s.minutes }}</div></div>
+    <div class="col-sm-4"><div class="text-secondary small">You paid</div><div class="stat-n">{{ s.cost_cents | dollars }}</div></div>
+    <div class="col-sm-4"><div class="text-secondary small">Left</div><div class="stat-n">{{ balance | dollars }}</div></div>
+  </div>
+</div></div>
+<div class="d-flex gap-2"><a class="btn btn-primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="btn btn-outline-light" href="/account">Account</a></div>
+{% else %}
+<div class="alert alert-primary">Running since {{ s.started_at }}. You have {{ balance | dollars }} left, about {{ minutes_left }} minutes at this price.</div>
+<div class="chat-placeholder">
+  <div><i class="bi bi-chat-dots fs-1 d-block mb-2"></i>The chat connects here once the host program is running on this machine.</div>
+</div>
+<form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
+{% endif %}
 {% endblock %}

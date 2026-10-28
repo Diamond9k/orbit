@@ -1,53 +1,50 @@
 {% extends "base.html" %}
 {% block title %}Account · Orbit{% endblock %}
 {% block body %}
-<section>
-  <h1>Your account</h1>
-  <p class="big-number">{{ balance | dollars }} <span class="muted">of hardware time</span></p>
-  <p><a class="button" href="/store">Add time</a> <a class="button ghost" href="/run">Run a model</a></p>
-</section>
+<div class="d-flex justify-content-between align-items-end flex-wrap gap-3 mb-4">
+  <div><h1 class="h2 mb-1">Your account</h1><div class="text-secondary">{{ user.email }}</div></div>
+  <div class="d-flex gap-2"><a class="btn btn-primary" href="/store"><i class="bi bi-plus-circle me-1"></i>Add time</a><a class="btn btn-outline-light" href="/run">Run a model</a></div>
+</div>
 
-<section>
-  <h2>Sessions</h2>
+<div class="row g-3 mb-4">
+  <div class="col-sm-4"><div class="card"><div class="card-body"><div class="text-secondary small">Hardware time</div><div class="stat-n">{{ balance | dollars }}</div></div></div></div>
+  <div class="col-sm-4"><div class="card"><div class="card-body"><div class="text-secondary small">Sessions</div><div class="stat-n">{{ sessions | length }}</div></div></div></div>
+  <div class="col-sm-4"><div class="card"><div class="card-body"><div class="text-secondary small">Machines listed</div><div class="stat-n">{{ hosts | length }}</div></div></div></div>
+</div>
+
+<div class="card mb-4"><div class="card-header fw-semibold">Sessions</div>
   {% if sessions %}
-  <table>
-    <tr><th>Model</th><th>Machine</th><th>Started</th><th>Minutes</th><th>Cost</th><th></th></tr>
-    {% for s in sessions %}
-    <tr>
-      <td>{{ s.model }}</td><td>{{ s.host_name }}</td><td>{{ s.started_at }}</td>
-      <td>{{ s.minutes if s.minutes is not none else "running" }}</td>
-      <td>{{ s.cost_cents | dollars if s.cost_cents is not none else "" }}</td>
-      <td><a href="/sessions/{{ s.id }}">open</a></td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}<p class="muted">No sessions yet.</p>{% endif %}
-</section>
+  <div class="table-responsive"><table class="table mb-0 align-middle">
+    <thead><tr><th>Model</th><th>Machine</th><th>Started</th><th class="text-end">Minutes</th><th class="text-end">Cost</th><th></th></tr></thead>
+    <tbody>{% for s in sessions %}
+    <tr><td class="fw-semibold">{{ s.model }}</td><td>{{ s.host_name }}</td><td class="text-secondary">{{ s.started_at }}</td>
+        <td class="text-end">{% if s.minutes is not none %}{{ s.minutes }}{% else %}<span class="badge text-bg-success">running</span>{% endif %}</td>
+        <td class="text-end">{{ s.cost_cents | dollars if s.cost_cents is not none else "" }}</td>
+        <td class="text-end"><a class="btn btn-sm btn-outline-light" href="/sessions/{{ s.id }}">Open</a></td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<div class="card-body text-secondary">No sessions yet. <a href="/run">Run a model</a> to start one.</div>{% endif %}
+</div>
 
 {% if hosts %}
-<section>
-  <h2>Your machines</h2>
-  <table>
-    <tr><th>Name</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Status</th><th>Earned</th></tr>
-    {% for h in hosts %}
-    <tr><td>{{ h.name }}</td><td>{{ h.gpu }}</td><td>{{ h.vram_gb }} GB</td>
-        <td>{{ h.price_cents_per_hour | dollars }}</td><td>{{ h.status }}</td>
-        <td>{{ host_earned[h.id] | dollars }}</td></tr>
-    {% endfor %}
-  </table>
-</section>
+<div class="card mb-4"><div class="card-header fw-semibold">Your machines</div>
+  <div class="table-responsive"><table class="table mb-0 align-middle">
+    <thead><tr><th>Name</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Status</th><th class="text-end">Earned</th></tr></thead>
+    <tbody>{% for h in hosts %}
+    <tr><td class="fw-semibold">{{ h.name }}</td><td>{{ h.gpu }}</td><td>{{ h.vram_gb }} GB</td><td>{{ h.price_cents_per_hour | dollars }}</td>
+        <td><span class="badge {{ 'text-bg-success' if h.status == 'online' else 'text-bg-warning' if h.status == 'busy' else 'text-bg-secondary' }}">{{ h.status }}</span></td>
+        <td class="text-end">{{ host_earned[h.id] | dollars }}</td></tr>
+    {% endfor %}</tbody></table></div>
+</div>
 {% endif %}
 
-<section>
-  <h2>Ledger</h2>
+<div class="card"><div class="card-header fw-semibold">Ledger</div>
   {% if history %}
-  <table>
-    <tr><th>When</th><th>What</th><th>Amount</th></tr>
-    {% for r in history %}
-    <tr><td>{{ r.created_at }}</td><td>{{ r.memo }}</td>
-        <td class="{{ 'pos' if r.amount_cents > 0 else 'neg' }}">{{ r.amount_cents | dollars }}</td></tr>
-    {% endfor %}
-  </table>
-  {% else %}<p class="muted">Nothing yet.</p>{% endif %}
-</section>
+  <div class="table-responsive"><table class="table mb-0 align-middle">
+    <thead><tr><th>When</th><th>What</th><th class="text-end">Amount</th></tr></thead>
+    <tbody>{% for r in history %}
+    <tr><td class="text-secondary">{{ r.created_at }}</td><td>{{ r.memo }}</td>
+        <td class="text-end {{ 'text-success' if r.amount_cents > 0 else 'text-danger' }}">{{ r.amount_cents | dollars }}</td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<div class="card-body text-secondary">Nothing yet.</div>{% endif %}
+</div>
 {% endblock %}

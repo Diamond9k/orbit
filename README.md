@@ -62,6 +62,7 @@ orbit/ledger.py     the only code that moves money
 orbit/fit.py        does this model fit on that GPU
 orbit/auth.py       sign-in
 orbit/db.py         SQLite schema
-orbit/templates/    HTML pages
+orbit/templates/    HTML pages, built on Bootstrap 5
+orbit/static/vendor/ Bootstrap and Bootstrap Icons, self-hosted (MIT)
 tests/              ledger, fit and full-loop tests
 ```

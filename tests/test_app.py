@@ -28,7 +28,8 @@ def test_full_loop(client):
     # list a machine and bring it online
     r = client.post("/hosts", data={"name": "Box", "gpu": "RTX 4090", "vram_gb": 24, "price_dollars_per_hour": 0.60})
     assert r.status_code == 200
-    token = r.text.split("<pre>")[1].split("</pre>")[0].strip()
+    import re
+    token = re.search(r"<pre[^>]*>(.*?)</pre>", r.text, re.S).group(1).strip()
     assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"ok": True}
     # no money yet: can't start
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
@@ -44,7 +45,7 @@ def test_full_loop(client):
     r = client.post("/sessions/1/stop", follow_redirects=False)
     assert r.status_code == 303
     page = client.get("/sessions/1").text
-    assert "Ended. You used 1 minute" in page
+    assert "Minutes used" in page and ">ended<" in page
     assert client.get("/health").json()["ok"] is True
     acct = client.get("/account").text
     assert "$9.99" in acct

@@ -1,33 +1,60 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Orbit{% endblock %}</title>
+<link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
+<link rel="stylesheet" href="/static/vendor/bootstrap-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-<header>
-  <a class="brand" href="/">Orbit</a>
-  <nav>
-    <a href="/run">Run a model</a>
-    <a href="/hosts">Hosts</a>
-    {% if user %}
-      <a href="/store">Add time</a>
-      <a href="/account">{{ user.email }}</a>
-      <form method="post" action="/logout" class="inline"><button class="link">Sign out</button></form>
-    {% else %}
-      <a href="/login">Sign in</a>
-      <a href="/signup" class="button">Get started</a>
-    {% endif %}
-  </nav>
-</header>
-<main>
-{% block body %}{% endblock %}
+<body class="d-flex flex-column min-vh-100">
+<nav class="navbar navbar-expand-md sticky-top">
+  <div class="container">
+    <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/">
+      <i class="bi bi-circle-half text-primary"></i> Orbit
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="nav">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link" href="/run">Run a model</a></li>
+        <li class="nav-item"><a class="nav-link" href="/hosts">Hosts</a></li>
+      </ul>
+      <ul class="navbar-nav align-items-md-center gap-2">
+        {% if user %}
+          <li class="nav-item"><a class="nav-link" href="/store"><i class="bi bi-plus-circle me-1"></i>Add time</a></li>
+          <li class="nav-item"><a class="nav-link" href="/account"><i class="bi bi-person-circle me-1"></i>{{ user.email }}</a></li>
+          <li class="nav-item"><form method="post" action="/logout"><button class="btn btn-outline-light btn-sm">Sign out</button></form></li>
+        {% else %}
+          <li class="nav-item"><a class="nav-link" href="/login">Sign in</a></li>
+          <li class="nav-item"><a class="btn btn-primary" href="/signup">Get started</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<main class="flex-grow-1">
+  <div class="container py-4">
+  {% block body %}{% endblock %}
+  </div>
 </main>
-<footer>
-  <p>Orbit holds a list of machines and a ledger. Your model and your conversation run on the host, never here.</p>
-  {% if dev %}<p class="dev">Development mode is on. Test funds are enabled.</p>{% endif %}
+
+<footer class="py-4 mt-5">
+  <div class="container d-flex flex-column flex-md-row justify-content-between gap-3 text-secondary small">
+    <div>
+      <div class="fw-semibold text-body">Orbit</div>
+      Orbit holds a list of machines and a ledger. Your model and your conversation run on the host, never here.
+      {% if dev %}<div class="text-warning mt-2">Development mode is on. Test funds are enabled.</div>{% endif %}
+    </div>
+    <div class="d-flex gap-4">
+      <div><div class="fw-semibold text-body mb-1">Use</div><a class="d-block link-secondary" href="/run">Run a model</a><a class="d-block link-secondary" href="/store">Add time</a></div>
+      <div><div class="fw-semibold text-body mb-1">Host</div><a class="d-block link-secondary" href="/hosts">List a machine</a></div>
+    </div>
+  </div>
 </footer>
+<script src="/static/vendor/bootstrap.bundle.min.js"></script>
 </body>
 </html>

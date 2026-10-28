@@ -1,24 +1,74 @@
 {% extends "base.html" %}
 {% block body %}
-<section class="hero">
-  <h1>Run open source models.<br>Pay only for the hardware.<br>No API credits.</h1>
-  <p>Pick any model on Hugging Face. Orbit finds one machine that fits it and gives it to you alone for as long as you need. A guide sits with you from the first second.</p>
-  <p class="actions">
-    <a class="button big" href="/signup">Get started</a>
-    <a class="button big ghost" href="/run">See what fits</a>
-  </p>
-  <p class="muted">Machines online right now: {{ hosts_online }}</p>
+<section class="hero row align-items-center g-5">
+  <div class="col-lg-7">
+    <h1 class="display-4 mb-3">Run open source models.<br>Pay only for the hardware.<br>No API credits.</h1>
+    <p class="lead text-secondary">Pick any model on Hugging Face. Orbit finds one machine that fits it and gives it to you alone for as long as you need. A guide sits with you from the first second.</p>
+    <div class="d-flex flex-wrap gap-2 my-4">
+      <a class="btn btn-primary btn-lg" href="/signup">Get started</a>
+      <a class="btn btn-outline-light btn-lg" href="/run">See what fits</a>
+    </div>
+    <div class="text-secondary small"><i class="bi bi-circle-fill text-success me-1" style="font-size:.5rem"></i> Machines online right now: <strong class="text-body">{{ hosts_online }}</strong></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card demo-card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="kicker">Session</span>
+          <span class="badge text-bg-success">running</span>
+        </div>
+        <div class="fw-bold mb-3">Qwen2.5-7B-Instruct · Q4_K_M</div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item d-flex justify-content-between px-0"><span class="text-secondary">Machine</span><span>RTX 4090 · 24 GB</span></li>
+          <li class="list-group-item d-flex justify-content-between px-0"><span class="text-secondary">Yours alone</span><span>yes</span></li>
+          <li class="list-group-item d-flex justify-content-between px-0"><span class="text-secondary">Price</span><span>$0.60 / hour</span></li>
+          <li class="list-group-item d-flex justify-content-between px-0"><span class="text-secondary">Orbit can see your chat</span><span>no</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="text-secondary small mt-2 text-center">Example session. Prices are set by each host.</div>
+  </div>
 </section>
 
-<section class="three">
-  <div><h3>One machine, yours</h3><p>No sharing. The whole GPU is yours until you stop.</p></div>
-  <div><h3>Any open model</h3><p>Type a Hugging Face model name. Orbit tells you if it fits, honestly.</p></div>
-  <div><h3>Hardware time, not tokens</h3><p>You pay by the hour for a machine. Not per word, not per request.</p></div>
+<section class="my-5">
+  <div class="kicker">How it works</div>
+  <h2 class="mb-4">Three steps, nothing to install</h2>
+  <div class="row g-3">
+    <div class="col-md-4"><div class="card h-100"><div class="card-body">
+      <div class="step-num mb-3">1</div><h5 class="card-title">Name a model</h5>
+      <p class="card-text text-secondary">Type a Hugging Face model name. Orbit reads its size and tells you which machines it fits on. If it can't tell, it says so.</p>
+    </div></div></div>
+    <div class="col-md-4"><div class="card h-100"><div class="card-body">
+      <div class="step-num mb-3">2</div><h5 class="card-title">Add hardware time</h5>
+      <p class="card-text text-secondary">Pay by card for time on a machine. Shown in dollars and minutes. Not tokens, not credits.</p>
+    </div></div></div>
+    <div class="col-md-4"><div class="card h-100"><div class="card-body">
+      <div class="step-num mb-3">3</div><h5 class="card-title">Start</h5>
+      <p class="card-text text-secondary">The machine is yours alone. The model loads. You talk to it, and a guide answers your questions along the way.</p>
+    </div></div></div>
+  </div>
 </section>
 
-<section class="host-cta">
-  <h2>Have an idle GPU?</h2>
-  <p>List it. You are paid for every hour someone uses it, and nothing when they don't.</p>
-  <a class="button" href="/hosts">List your machine</a>
+<section class="my-5 row g-3">
+  <div class="col-md-6"><div class="card h-100"><div class="card-body">
+    <div class="kicker">What you pay</div>
+    <h4>One number. Per hour. Set by the host.</h4>
+    <p class="text-secondary mb-0">You see the price before you start. You are charged by the minute while the session runs. When you stop, you see what you used and what is left. Nothing else is ever charged.</p>
+  </div></div></div>
+  <div class="col-md-6"><div class="card h-100"><div class="card-body">
+    <div class="kicker">What Orbit keeps</div>
+    <h4>A list and a ledger.</h4>
+    <p class="text-secondary mb-0">Orbit knows which machines are online and what you paid. Your model and your conversation run on the host and go straight to your browser. Orbit's server is built so it cannot read them.</p>
+  </div></div></div>
+</section>
+
+<section class="my-5">
+  <div class="card bg-primary-subtle border-0"><div class="card-body p-4 p-md-5 d-md-flex justify-content-between align-items-center gap-4">
+    <div>
+      <h3 class="mb-2">Have an idle GPU?</h3>
+      <p class="mb-md-0 text-secondary">List it. You are paid for every hour someone uses it, and nothing when they don't. Works from a normal gaming PC behind a home router.</p>
+    </div>
+    <a class="btn btn-primary btn-lg text-nowrap" href="/hosts">List your machine</a>
+  </div></div>
 </section>
 {% endblock %}

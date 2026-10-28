@@ -1,53 +1,49 @@
 {% extends "base.html" %}
 {% block title %}Run a model · Orbit{% endblock %}
 {% block body %}
-<section>
-  <h1>Run a model</h1>
-  {% if active %}
-  <p class="notice">You have a session running on {{ active.host_name }}. <a href="/sessions/{{ active.id }}">Open it</a>.</p>
-  {% endif %}
-  <form method="get" action="/run" class="row">
-    <input type="text" name="model" value="{{ model }}" placeholder="Hugging Face model, e.g. bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M" size="60" required>
-    <button class="button">Check fit</button>
-  </form>
-  <p class="muted">Orbit reads the size and quantization from the name. If the name does not say, Orbit says "unknown" rather than guess.</p>
-</section>
+<h1 class="h2 mb-1">Run a model</h1>
+<p class="text-secondary">Type a Hugging Face model name. Orbit reads the size and quantization from the name. If the name does not say, Orbit says "unknown" rather than guess.</p>
+
+{% if active %}
+<div class="alert alert-success d-flex justify-content-between align-items-center">
+  <span>You have a session running on <strong>{{ active.host_name }}</strong>.</span>
+  <a class="btn btn-sm btn-success" href="/sessions/{{ active.id }}">Open it</a>
+</div>
+{% endif %}
+
+<form method="get" action="/run" class="input-group input-group-lg mb-4">
+  <span class="input-group-text"><i class="bi bi-search"></i></span>
+  <input class="form-control" type="text" name="model" value="{{ model }}" placeholder="e.g. bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M" required>
+  <button class="btn btn-primary">Check fit</button>
+</form>
 
 {% if model %}
-<section>
-  <h2>Machines for <code>{{ model }}</code></h2>
-  {% if results %}
-  <table>
-    <tr><th>Machine</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Fit</th><th></th></tr>
-    {% for h, f in results %}
-    <tr>
-      <td>{{ h.name }}</td><td>{{ h.gpu }}</td><td>{{ h.vram_gb }} GB</td><td>{{ h.price_cents_per_hour | dollars }}</td>
-      <td class="fit-{{ f.verdict }}"><strong>{{ f.verdict.replace('_', ' ') }}</strong><br><span class="muted">{{ f.reason }}</span></td>
-      <td>
-        {% if f.verdict != 'too_big' %}
-          {% if user %}
-            {% if active %}
-              <span class="muted">session running</span>
-            {% elif balance >= h.price_cents_per_hour %}
-            <form method="post" action="/sessions/start">
-              <input type="hidden" name="model" value="{{ model }}">
-              <input type="hidden" name="host_id" value="{{ h.id }}">
-              <button class="button">Start</button>
-            </form>
-            {% else %}
-            <a class="button ghost" href="/store">Add time</a>
-            {% endif %}
-          {% else %}
-          <a class="button ghost" href="/signup">Get started</a>
-          {% endif %}
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}
-  <p class="muted">No machines are online right now.</p>
-  {% endif %}
-</section>
+<h2 class="h5 mb-3">Machines for <code>{{ model }}</code></h2>
+{% if results %}
+<div class="d-grid gap-3">
+  {% for h, f in results %}
+  <div class="card"><div class="card-body row g-3 align-items-center">
+    <div class="col-md-4"><div class="fw-bold">{{ h.name }}</div><div class="text-secondary small">{{ h.gpu }} · {{ h.vram_gb }} GB</div></div>
+    <div class="col-md-2"><div class="price-n">{{ h.price_cents_per_hour | dollars }}</div><div class="text-secondary small">per hour</div></div>
+    <div class="col-md-4">
+      <span class="badge {{ 'text-bg-success' if f.verdict == 'fits' else 'text-bg-warning' if f.verdict == 'tight' else 'text-bg-danger' if f.verdict == 'too_big' else 'text-bg-secondary' }} mb-1">{{ f.verdict.replace('_', ' ') }}</span>
+      <div class="text-secondary small">{{ f.reason }}</div>
+    </div>
+    <div class="col-md-2 text-md-end">
+      {% if f.verdict != 'too_big' %}
+        {% if user %}
+          {% if active %}<span class="text-secondary small">session running</span>
+          {% elif balance >= h.price_cents_per_hour %}
+          <form method="post" action="/sessions/start"><input type="hidden" name="model" value="{{ model }}"><input type="hidden" name="host_id" value="{{ h.id }}"><button class="btn btn-primary">Start</button></form>
+          {% else %}<a class="btn btn-outline-light" href="/store">Add time</a>{% endif %}
+        {% else %}<a class="btn btn-outline-light" href="/signup">Get started</a>{% endif %}
+      {% endif %}
+    </div>
+  </div></div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card"><div class="card-body text-secondary">No machines are online right now. <a href="/hosts">Be the first to list one.</a></div></div>
+{% endif %}
 {% endif %}
 {% endblock %}
