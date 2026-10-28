@@ -146,6 +146,10 @@ python3 -m pytest
 4. **Host tiers.** "Verified" for machines with enclave hardware that pass attestation,
    "community" for everyone else. Labels earned by the hardware.
 
+## The swarm
+
+Agents build Orbit on your own PC with open source models. See `docs/SWARM.md`.
+
 ## Contributing
 
 Work on a branch. `main` is protected and merged by the owner. Before a pull request, run the

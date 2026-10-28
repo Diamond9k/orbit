@@ -1,0 +1,48 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  merge-green-build:
+    # A build/ branch the critic passed: open a pull request and let it merge once this
+    # workflow's tests check is green. Requires auto-merge allowed in repo settings and
+    # main protected with the "tests" check required.
+    needs: tests
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/build/')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          # Title is what was built: the first line of the newest commit that isn't housekeeping.
+          TITLE="$(git log origin/main..HEAD --format=%s | grep -v '^swarm:' | head -1)"
+          TITLE="${TITLE:-$BRANCH}"
+          BODY="$(git log origin/main..HEAD --format='- %s')"
+          if ! gh pr view "$BRANCH" >/dev/null 2>&1; then
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" \
+              --body "Built by the swarm. Tests passed. Critic found nothing. Merges itself when checks are green.
+
+$BODY"
+          fi
+          gh pr merge "$BRANCH" --auto --squash
