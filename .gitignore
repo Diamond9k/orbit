@@ -11,3 +11,6 @@ __pycache__/
 .aider*
 workspace/runs/*
 !workspace/runs/.gitkeep
+workspace/state.json
+workspace/ESCALATE.md
+swarm/STOP

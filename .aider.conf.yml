@@ -4,9 +4,11 @@
 model: openai/local
 openai-api-base: http://127.0.0.1:8080/v1
 openai-api-key: local
+edit-format: whole
 auto-commits: true
 auto-test: true
 test-cmd: python -m pytest -q
+map-tokens: 512
 read:
   - CLAUDE.md
   - docs/NEXT.md
