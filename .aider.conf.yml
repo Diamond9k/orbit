@@ -1,0 +1,9 @@
+# Aider settings for the Orbit swarm. Aider reads this file from the repo root.
+# The model runs on this PC through Ollama. Change the name if you pull a different one.
+model: ollama_chat/qwen2.5-coder:32b
+auto-commits: true
+auto-test: true
+test-cmd: python3 -m pytest -q
+read:
+  - CLAUDE.md
+  - docs/NEXT.md
