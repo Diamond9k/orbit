@@ -152,11 +152,13 @@ def account(request: Request, user=Depends(require_user), conn=Depends(get_db)):
         "SELECT s.*, h.name AS host_name FROM sessions s JOIN hosts h ON h.id = s.host_id "
         "WHERE s.user_id = ? ORDER BY s.id DESC LIMIT 20", (user["id"],)
     ).fetchall()
-    hosts = conn.execute("SELECT * FROM hosts WHERE owner_id = ? ORDER BY id", (user["id"],)).fetchall()
+    hosts = conn.execute("SELECT * FROM hosts WHERE owner_id = ? AND status != 'removed' ORDER BY id", (user["id"],)).fetchall()
     host_earned = {h["id"]: ledger.balance(conn, f"host:{h['id']}") for h in hosts}
-    return render(request, "account.html", user=user, _conn=conn, balance=ledger.balance(conn, acct),
+    resp = render(request, "account.html", user=user, _conn=conn, balance=ledger.balance(conn, acct),
                   history=ledger.history(conn, acct, 20), sessions=sessions, hosts=hosts,
-                  host_earned=host_earned)
+                  host_earned=host_earned, flash=take_flash(request))
+    resp.delete_cookie("orbit_flash")
+    return resp
 
 
 @app.get("/store", response_class=HTMLResponse)
@@ -226,7 +228,7 @@ def run_page(request: Request, model: str = "", user=Depends(current_user), conn
     if model:
         params, quant = fit.parse(model)
         need_quant = params is not None and quant is None
-        hosts = conn.execute("SELECT * FROM hosts WHERE status != 'offline' ORDER BY price_cents_per_hour").fetchall()
+        hosts = conn.execute("SELECT * FROM hosts WHERE status IN ('online', 'busy') ORDER BY price_cents_per_hour").fetchall()
         results = [(h, fit.check(model, h["vram_gb"])) for h in hosts]
         order = {"fits": 0, "tight": 1, "unknown": 2, "too_big": 3}
         results.sort(key=lambda r: (r[0]["status"] != "online", order[r[1].verdict]))
@@ -320,7 +322,7 @@ def stop_session(sid: int, user=Depends(require_user), conn=Depends(get_db)):
 
 @app.get("/hosts", response_class=HTMLResponse)
 def hosts_page(request: Request, user=Depends(current_user), conn=Depends(get_db)):
-    hosts = conn.execute("SELECT * FROM hosts ORDER BY status DESC, price_cents_per_hour").fetchall()
+    hosts = conn.execute("SELECT * FROM hosts WHERE status != 'removed' ORDER BY status DESC, price_cents_per_hour").fetchall()
     return render(request, "hosts.html", user=user, hosts=hosts, error=None, new_token=None, _conn=conn)
 
 
@@ -336,8 +338,24 @@ def add_host(request: Request, name: str = Form(...), gpu: str = Form(...), vram
         "INSERT INTO hosts (owner_id, name, gpu, vram_gb, price_cents_per_hour, token) VALUES (?, ?, ?, ?, ?, ?)",
         (user["id"], name.strip(), gpu.strip(), vram_gb, price_cents, token),
     )
-    hosts = conn.execute("SELECT * FROM hosts ORDER BY status DESC, price_cents_per_hour").fetchall()
+    hosts = conn.execute("SELECT * FROM hosts WHERE status != 'removed' ORDER BY status DESC, price_cents_per_hour").fetchall()
     return render(request, "hosts.html", user=user, hosts=hosts, error=None, new_token=token, _conn=conn)
+
+
+@app.post("/hosts/{hid}/remove")
+def remove_host(hid: int, user=Depends(require_user), conn=Depends(get_db)):
+    with db.tx(conn):
+        h = conn.execute("SELECT * FROM hosts WHERE id = ? AND owner_id = ?", (hid, user["id"])).fetchone()
+        if h is None:
+            raise UserError("That machine is not yours or does not exist.", "/account")
+        if h["status"] == "busy":
+            raise UserError("That machine is in a session. Wait for it to end.", "/account")
+        if conn.execute("SELECT 1 FROM sessions WHERE host_id = ? LIMIT 1", (hid,)).fetchone():
+            # Keep the row for the ledger history; just take it off the list for good.
+            conn.execute("UPDATE hosts SET status = 'removed', token = token || ':removed' WHERE id = ?", (hid,))
+        else:
+            conn.execute("DELETE FROM hosts WHERE id = ?", (hid,))
+    return RedirectResponse("/account", status_code=303)
 
 
 # ---------- API for the host program (step 2) ----------
@@ -347,7 +365,7 @@ def heartbeat(token: str = Form(...), conn=Depends(get_db)):
     """The host program calls this every minute while it is ready for work."""
     cur = conn.execute(
         "UPDATE hosts SET last_seen = datetime('now'), status = CASE WHEN status = 'busy' THEN 'busy' ELSE 'online' END "
-        "WHERE token = ?", (token,)
+        "WHERE token = ? AND status != 'removed'", (token,)
     )
     if cur.rowcount == 0:
         raise HTTPException(401, "unknown host token")

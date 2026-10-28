@@ -58,3 +58,12 @@ def test_hugging_face_url_is_cleaned(client):
     assert clean_model("https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF") == "bartowski/Qwen2.5-7B-Instruct-GGUF"
     assert clean_model("https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/tree/main") == "bartowski/Qwen2.5-7B-Instruct-GGUF"
     assert clean_model("  bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M ") == "bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M"
+
+
+def test_remove_host(client):
+    client.post("/signup", data={"email": "h@b.co", "password": "longenough"}, follow_redirects=False)
+    client.post("/hosts", data={"name": "Old", "gpu": "RX 580", "vram_gb": 16, "price_dollars_per_hour": 1})
+    assert "Old" in client.get("/hosts").text
+    r = client.post("/hosts/1/remove", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/account"
+    assert "Old" not in client.get("/hosts").text
