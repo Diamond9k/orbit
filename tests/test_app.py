@@ -31,16 +31,18 @@ def test_full_loop(client):
     import re
     token = re.search(r"<pre[^>]*>(.*?)</pre>", r.text, re.S).group(1).strip()
     assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"ok": True}
-    # no money yet: can't start
+    # no money yet: can't start. Friendly redirect back with a message, not an error code.
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
-    assert r.status_code == 402
+    assert r.status_code == 303 and "orbit_flash" in r.headers.get("set-cookie", "")
+    page = client.get("/?model=x/Model-7B-Q4_K_M", cookies={"orbit_flash": "You need at least one hour"}).text
+    assert "You need at least one hour" in page
     # add test funds and start
     client.post("/store/dev-funds", data={"amount_cents": 1000}, follow_redirects=False)
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/sessions/1"
-    # a second session is refused while one runs
+    # a second session is refused while one runs, and sends you to the running one
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
-    assert r.status_code == 409
+    assert r.status_code == 303 and r.headers["location"] == "/sessions/1"
     # stop: one minute minimum at $0.60/h = 1 cent, host gets 80%, orbit 20%
     r = client.post("/sessions/1/stop", follow_redirects=False)
     assert r.status_code == 303
@@ -49,3 +51,10 @@ def test_full_loop(client):
     assert client.get("/health").json()["ok"] is True
     acct = client.get("/account").text
     assert "$9.99" in acct
+
+
+def test_hugging_face_url_is_cleaned(client):
+    from orbit.app import clean_model
+    assert clean_model("https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF") == "bartowski/Qwen2.5-7B-Instruct-GGUF"
+    assert clean_model("https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/tree/main") == "bartowski/Qwen2.5-7B-Instruct-GGUF"
+    assert clean_model("  bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M ") == "bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M"
