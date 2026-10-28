@@ -67,3 +67,15 @@ def test_remove_host(client):
     r = client.post("/hosts/1/remove", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/account"
     assert "Old" not in client.get("/hosts").text
+
+
+def test_dotenv_loader_does_not_override(tmp_path, monkeypatch):
+    from orbit.__main__ import load_dotenv
+    f = tmp_path / ".env"
+    f.write_text("# comment\nORBIT_TEST_A=hello\nORBIT_TEST_B='quoted'\nORBIT_TEST_C=keep\n")
+    monkeypatch.setenv("ORBIT_TEST_C", "already")
+    monkeypatch.delenv("ORBIT_TEST_A", raising=False)
+    load_dotenv(f)
+    assert os.environ["ORBIT_TEST_A"] == "hello"
+    assert os.environ["ORBIT_TEST_B"] == "quoted"
+    assert os.environ["ORBIT_TEST_C"] == "already"
