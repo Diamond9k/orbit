@@ -50,6 +50,7 @@ All optional, set as environment variables.
 ## Tests
 
 ```
+pip install -r requirements-dev.txt
 python -m pytest
 ```
 
