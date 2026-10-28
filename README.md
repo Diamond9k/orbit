@@ -78,7 +78,7 @@ Leave it unset for real use.
 
 ## Settings
 
-All optional, set as environment variables.
+All optional, set as environment variables, or put `KEY=value` lines in a file named `.env` in the folder you run from. That file is ignored by git and must never be committed.
 
 | Name | What | Default |
 |---|---|---|
