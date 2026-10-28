@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Orbit">
+  <title>Orbit</title>
+  <desc>
+    An open ring with a single small hollow node resting in the opening.
+    Freedom from restriction: the ring is not closed; nothing is sealed in and nothing is kept out.
+    Private use of what is private: the node is a hollow circle, a small room of its own, not a dot on a tracker.
+    Orbit, subtly: the node lies on the ring's path, so it reads as something circling you without an orbit line.
+  </desc>
+  <g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round">
+    <path d="M 82.68 40.63 A 34 34 0 1 1 64.91 19.44"/>
+    <circle cx="76.04" cy="28.15" r="6"/>
+  </g>
+</svg>
