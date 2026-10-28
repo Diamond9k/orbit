@@ -38,11 +38,9 @@ jobs:
           # Title is what was built: the first line of the newest commit that isn't housekeeping.
           TITLE="$(git log origin/main..HEAD --format=%s | grep -v '^swarm:' | head -1)"
           TITLE="${TITLE:-$BRANCH}"
-          BODY="$(git log origin/main..HEAD --format='- %s')"
+          COMMITS="$(git log origin/main..HEAD --format='- %s')"
+          BODY="$(printf 'Built by the swarm. Tests passed. Critic found nothing. Merges itself when checks are green.\n\n%s' "$COMMITS")"
           if ! gh pr view "$BRANCH" >/dev/null 2>&1; then
-            gh pr create --base main --head "$BRANCH" --title "$TITLE" \
-              --body "Built by the swarm. Tests passed. Critic found nothing. Merges itself when checks are green.
-
-$BODY"
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
           fi
           gh pr merge "$BRANCH" --auto --squash
