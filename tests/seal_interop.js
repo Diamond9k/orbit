@@ -1,8 +1,10 @@
 /* Plays the browser for tests/test_seal.py, using the real orbit/static/seal.js under Node.
    Line protocol on stdin/stdout, one JSON object per line:
-     in  {"session_id": 7, "host_hello": "<envelope>"}   -> out {"user_hello": "...", "sealed": "...", "att": {...}}
+     in  {"session_id": 7, "host_hello": "<envelope>"}   -> out {"user_hello": "...", "sealed": "...", "att": {...}, "epoch": "..."}
      in  {"open": "<envelope from the host>"}            -> out {"text": "..."}
      in  {"seal": "plain text"}                          -> out {"sealed": "..."}
+     in  {"accept": "<another host hello>"}              -> out {"att": {...}, "epoch": "...", "user_hello": "...", "sent": 0, "received": 0}
+         (the sealer already made takes a further hello: a re-key, or a replay; tests/test_seal_adversary.py)
    Any error -> out {"error": "..."} */
 'use strict';
 const path = require('path');
@@ -19,7 +21,11 @@ async function handle(line) {
   if (req.host_hello !== undefined) {
     sealer = await OrbitSeal.create(req.session_id, 'user');
     const att = await sealer.accept(req.host_hello);
-    return {user_hello: sealer.hello(), sealed: await sealer.seal(req.text || 'hello from the browser'), att: att};
+    return {user_hello: sealer.hello(), sealed: await sealer.seal(req.text || 'hello from the browser'), att: att, epoch: sealer.epoch};
+  }
+  if (req.accept !== undefined) {
+    const att = await sealer.accept(req.accept);
+    return {att: att, epoch: sealer.epoch, user_hello: sealer.hello(), sent: sealer.sent, received: sealer.received};
   }
   if (req.open !== undefined) return {text: await sealer.unseal(req.open)};
   if (req.seal !== undefined) return {sealed: await sealer.seal(req.seal)};
