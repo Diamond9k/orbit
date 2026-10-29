@@ -97,6 +97,147 @@ Cooper's yes.
 
 Newest first. Each entry: date, what changed, evidence, what is next.
 
+### 2026-10-29 04:50 CDT (UTC-05:00) (same session: the pause, Cooper's correction, the fleet revised)
+
+**Cooper's correction, 04:05, verbatim where it binds.** "Pause the current fleet and preserve all
+work already completed. Do not delete branches, reset worktrees, or stop the local model server."
+"Local open-source models on my own hardware are the default for daily work. Before launching any
+Claude subagent, ask: can a local model do this task to an acceptable standard? If we don't know,
+run a small, bounded test and measure the result. Do not launch parallel paid or plan-usage Claude
+agents by default. Use one only when local work has failed, the task requires capabilities we
+cannot reasonably verify locally, or independent review is needed for sensitive work. Tell me what
+it will do and why it is worth the usage before starting it." "Redesign the fleet around one
+director, local workers, bounded attempts, and independent checks. Test one local task before
+scaling up. Track useful work completed, failures, time, and Claude usage." "Do not restart the
+fleet until you have shown me the revised setup." Minutes earlier: "I want to always first think
+'can we run the ai model that needs to be ran for the desired outcome using open source models on
+personal compute for zero cost'".
+
+**What Keystone had done wrong.** Launched four Fable 5.1 agents in parallel at 03:50, each with a
+budget of one to two hours, on Cooper's shared plan limits, and said which model only in the
+record, not in chat. Measured usage before the pause: T3 154,524 tokens, T4 151,965; T1 and T2
+unmeasured (killed).
+
+**The pause, 04:05.** All agents stopped; nothing deleted; the model server untouched. T1's
+unfinished UI work saved as a WIP commit (`f9b423a`, `keystone/ui`, 11 files, tests pass, not
+reviewed). T2 had produced nothing on either model. T4's report filed on `keystone/fleet`. T3 done.
+
+**T3 reviewed by the director, and widened.** The builder's nonce finding was correct and larger
+than it said: `accept()` reset the counters on any repeated hello, so the ordinary page reload
+(key pair restored, log replayed, hello re-sent) made the host reuse an AES-GCM nonce and refuse
+the next message. Fixed on both ends with no wire change: a hello with the current peer key is a
+no-op, a key from an earlier epoch is refused; a reload is now played end to end by the real
+`seal.js` under Node. Pull request 26, 73 tests. It waits for an independent second review, as
+Cooper's rule asks for security changes.
+
+**The fleet, revised.** `docs/FLEET.md`: one director (this session, not always on); local workers
+(the 14B through llama.cpp, one slot) for small tasks with named files and tests written first;
+scripts for everything that needs no model; a stronger model last, one at a time, announced, with
+its usage recorded. Bounded attempts: one build, one fix, time-boxed, then escalation. Checks the
+builder does not control: tests here and on GitHub, a scope check, the local critic, the
+director's read; a stronger-model review for money, sessions and the host program. Tracking:
+`docs/evidence/fleet-ledger.md`, one row per piece of work, summed per worker by `swarm/ledger.py`.
+
+**A limit met.** This session's permission classifier refuses to launch aider with `--yes-always`
+("Create Unsafe Agents"), so the director cannot start the swarm's own loop. Instead the director
+drives the local model through plain chat calls: spec and tests first, the model answers with one
+complete file, the director writes it and runs the tests, two attempts at most. That is the first
+bounded test (T6, the ledger tool). Result at 04:18: accepted; the 14B wrote the 72-line tool
+from the tests in 196 s at no cost, and the one failing test was the director's own mistake,
+corrected; pull request 27. Driver: `swarm/local_task.py`.
+
+**Evidence, by kind.** Code-supported: 73 tests on `keystone/seal-adversary`, 56 on
+`keystone/fleet`, 53 on the paused `keystone/ui`. Controlled: nothing new. Real people: none.
+
+**Decisions now Cooper's.** Approve or amend the revised setup before anything restarts. Who gives
+pull request 26 its second review. What becomes of the paused UI branch: resume page by page with
+the local worker under the director's eye, or one announced Claude agent. Whether the privacy
+research is done by the director in pieces. Merge or send back pull request 25.
+
+**Next meaningful step.** After Cooper's go: local tasks one at a time through the ladder, the
+host-as-an-app build first.
+
+**Sign-off, 04:35.** Cooper: "save this going to sleep I will message Keystone in claude terminal chat
+when the agent should arise". Everything above is pushed; the fleet stays paused; no process of
+Keystone's runs. Keystone does nothing until Cooper's message, then starts from the decisions list.
+
+### 2026-10-29 03:45 CDT (UTC-05:00) (third run: crash recovery, the merges, the fleet)
+
+**What happened between runs.** Cooper merged pull requests 22, 23 and 24 himself; main is
+`785d9eb` and its 53 tests pass on this PC. The session that wrote the previous entry then
+died: Cooper's screenshot of 03:15 shows the Claude Code runtime (Bun 1.4.4) reporting a
+segmentation fault. Nothing was mid-write, no agent was running, no work was lost. This entry is
+written by a new session that recovered its context from this record, the repository and the
+ports, as the record intends.
+
+**Cooper's direction, received this run.** First: "Your previous session crashed. Before
+continuing, inspect your saved session context, docs/KEYSTONE.md, the current branch and
+worktrees, uncommitted changes, and any agent work already running. Tell me what was completed,
+what was interrupted, and what you will resume. Preserve all existing work; do not start
+duplicate agents or stop other services." Then an expanded operating prompt (prepared by Codex
+for Cooper) that widens Keystone's charge to a coordinated fleet, a durable task board, the
+privacy workstream and the whole product's visual design. Its binding lines, verbatim: "A sealed
+relay does not by itself protect inference from the host. Do not redefine the goal as asking
+users to trust an ordinary host." "Do not silently downgrade a requested protected session to
+plaintext or an unverified mode." "Never state that an active broker or hardware owner cannot
+read messages unless the required defenses are actually present and independently verified."
+"Do not present prototype encryption as protection from the hardware owner." "Do not expose
+secrets, perform unattended destructive cleanup, or silently push into an auto-merge path." "Do
+not pretend this prompt alone creates an always-on agent fleet." On design: a compact vertical
+icon rail like the Codex app, purposeful motion with honest indeterminate states and never a
+fabricated percentage, subtle beveled depth, a configurable purple accent with a functional
+role and contrast, a simple open orbital mark and node refined at 16, 24 and 32 px, tokens as
+CSS custom properties, reduced-motion alternatives, every state designed, no fake values.
+
+**Ground truth, verified by port and counter at 03:30.** Port 8000: the peer session's Orbit
+app from worktree `main-ro` at `5eb4994`, code from before the sealed chat, on Cooper's dev
+database; not touched. Ports 5400 and 5500: the peer's console and launcher, separate projects;
+not touched. Port 8080: llama.cpp serving Qwen2.5-Coder-14B Q4_K_M, healthy, holding 4.8 GB of
+the RX 580's 8 GB, a background job of the peer session that may stop when it does. Port 9222:
+the peer's headless Chromium. The swarm is idle; Keystone neither starts nor stops it. Ruleset
+26085278 on main still requires no status check and no review (question 3). REA is not
+available to this session; the Codex desktop app is installed (Appx 26.1023.6123.0) and its
+files were not opened (rule 8); Cooper's screenshot of 03:03 is the only evidence of the rail
+he likes, and only its visible qualities were used.
+
+**What changed this run, so far.** Branch `keystone/fleet`: this entry; `docs/BOARD.md`, the
+durable task board (ownership, acceptance checks, bounded retries, stop, recovery after a
+crash, what the code and not the board prevents); `docs/PATH.md`, the path from browser to
+payout with the grade of evidence per step and the obstacles ranked. Four tasks assigned to
+Claude agents in isolated worktrees branched from main, each with written acceptance checks and
+a budget, none touching the running services: T1 the visual design on `keystone/ui` (including
+explicit consent before a page sends unsealed), T2 protected-compute research on
+`keystone/privacy-boundary` (transport binding and code delivery, attested CPU and GPU,
+Bifrost, Maverick, FHE; licenses, hardware, measured versus projected), T3 adversary tests
+against the real sealing code on `keystone/seal-adversary` (and the host program no longer
+answering plaintext once sealed), T4 an evaluation of open-source UI tooling, report only. T5,
+an independent critic for T1 and T3, waits on them. Local open models were not used for these:
+the 14B coder is adequate for small scoped edits (the swarm's job) and not for design or
+security judgement; no paid API call was made.
+
+**Evidence, by kind.** Code-supported: main's tests, plus three interruption tests in
+`tests/test_recovery.py` (a restarted host program does not restart the clock, a restarted Orbit
+keeps the running session and its messages, a repeated stop bills once); 56 pass. A mistake,
+repaired: that file run on its own used the default database, so a synthetic user and machine
+landed in Cooper's dev `orbit.db` at 03:50 for a few minutes; both rows were listed and removed,
+nothing else was touched, and `tests/conftest.py` now pins every test to the throwaway database.
+`docs/decisions/2026-10-29-host-program-as-an-app.md` proposes how the host program ships
+(llama.cpp is MIT; its Windows Vulkan build is 37 MB). Controlled: nothing new yet this run.
+Real people: none. Everything above about the fleet is assignment, not result; results go in
+the next entry with the pull request numbers.
+
+**Decisions now Cooper's.** Delete the thirteen merged or superseded branches
+(`docs/BOARD.md`, For Cooper). Whether port 8000 should move to main's code. Question 3, the
+ruleset. The verified tier, a public address and payouts remain the three decisions that gate
+steps 8 to 10 of `docs/PATH.md`.
+
+**Lessons from Cooper's library opened for this run:** n52 (Impeccable), Module F3 (a design
+system as reusable tokens and components), j6 (thirty single-file design systems, as taste
+references), b24 (the official design skill); F4 (UI sniping) not used, rule 8.
+
+**Next meaningful step.** Critique and integrate the four branches through pull requests; then
+the host program that installs like an app, the first obstacle on `docs/PATH.md`.
+
 ### 2026-10-29 03:05 CDT (UTC-05:00) (second build run: the privacy goal, sealing, the protected-compute boundary)
 
 **Cooper's direction, received this run, verbatim.** "Orbit's privacy goal is to protect the
