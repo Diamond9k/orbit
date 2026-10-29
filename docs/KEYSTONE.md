@@ -97,6 +97,76 @@ Cooper's yes.
 
 Newest first. Each entry: date, what changed, evidence, what is next.
 
+### 2026-10-29 03:45 CDT (UTC-05:00) (third run: crash recovery, the merges, the fleet)
+
+**What happened between runs.** Cooper merged pull requests 22, 23 and 24 himself; main is
+`785d9eb` and its 53 tests pass on this PC. The session that wrote the previous entry then
+died: Cooper's screenshot of 03:15 shows the Claude Code runtime (Bun 1.4.4) reporting a
+segmentation fault. Nothing was mid-write, no agent was running, no work was lost. This entry is
+written by a new session that recovered its context from this record, the repository and the
+ports, as the record intends.
+
+**Cooper's direction, received this run.** First: "Your previous session crashed. Before
+continuing, inspect your saved session context, docs/KEYSTONE.md, the current branch and
+worktrees, uncommitted changes, and any agent work already running. Tell me what was completed,
+what was interrupted, and what you will resume. Preserve all existing work; do not start
+duplicate agents or stop other services." Then an expanded operating prompt (prepared by Codex
+for Cooper) that widens Keystone's charge to a coordinated fleet, a durable task board, the
+privacy workstream and the whole product's visual design. Its binding lines, verbatim: "A sealed
+relay does not by itself protect inference from the host. Do not redefine the goal as asking
+users to trust an ordinary host." "Do not silently downgrade a requested protected session to
+plaintext or an unverified mode." "Never state that an active broker or hardware owner cannot
+read messages unless the required defenses are actually present and independently verified."
+"Do not present prototype encryption as protection from the hardware owner." "Do not expose
+secrets, perform unattended destructive cleanup, or silently push into an auto-merge path." "Do
+not pretend this prompt alone creates an always-on agent fleet." On design: a compact vertical
+icon rail like the Codex app, purposeful motion with honest indeterminate states and never a
+fabricated percentage, subtle beveled depth, a configurable purple accent with a functional
+role and contrast, a simple open orbital mark and node refined at 16, 24 and 32 px, tokens as
+CSS custom properties, reduced-motion alternatives, every state designed, no fake values.
+
+**Ground truth, verified by port and counter at 03:30.** Port 8000: the peer session's Orbit
+app from worktree `main-ro` at `5eb4994`, code from before the sealed chat, on Cooper's dev
+database; not touched. Ports 5400 and 5500: the peer's console and launcher, separate projects;
+not touched. Port 8080: llama.cpp serving Qwen2.5-Coder-14B Q4_K_M, healthy, holding 4.8 GB of
+the RX 580's 8 GB, a background job of the peer session that may stop when it does. Port 9222:
+the peer's headless Chromium. The swarm is idle; Keystone neither starts nor stops it. Ruleset
+26085278 on main still requires no status check and no review (question 3). REA is not
+available to this session; the Codex desktop app is installed (Appx 26.1023.6123.0) and its
+files were not opened (rule 8); Cooper's screenshot of 03:03 is the only evidence of the rail
+he likes, and only its visible qualities were used.
+
+**What changed this run, so far.** Branch `keystone/fleet`: this entry; `docs/BOARD.md`, the
+durable task board (ownership, acceptance checks, bounded retries, stop, recovery after a
+crash, what the code and not the board prevents); `docs/PATH.md`, the path from browser to
+payout with the grade of evidence per step and the obstacles ranked. Four tasks assigned to
+Claude agents in isolated worktrees branched from main, each with written acceptance checks and
+a budget, none touching the running services: T1 the visual design on `keystone/ui` (including
+explicit consent before a page sends unsealed), T2 protected-compute research on
+`keystone/privacy-boundary` (transport binding and code delivery, attested CPU and GPU,
+Bifrost, Maverick, FHE; licenses, hardware, measured versus projected), T3 adversary tests
+against the real sealing code on `keystone/seal-adversary` (and the host program no longer
+answering plaintext once sealed), T4 an evaluation of open-source UI tooling, report only. T5,
+an independent critic for T1 and T3, waits on them. Local open models were not used for these:
+the 14B coder is adequate for small scoped edits (the swarm's job) and not for design or
+security judgement; no paid API call was made.
+
+**Evidence, by kind.** Code-supported: main's tests. Controlled: nothing new yet this run.
+Real people: none. Everything above about the fleet is assignment, not result; results go in
+the next entry with the pull request numbers.
+
+**Decisions now Cooper's.** Delete the thirteen merged or superseded branches
+(`docs/BOARD.md`, For Cooper). Whether port 8000 should move to main's code. Question 3, the
+ruleset. The verified tier, a public address and payouts remain the three decisions that gate
+steps 8 to 10 of `docs/PATH.md`.
+
+**Lessons from Cooper's library opened for this run:** n52 (Impeccable), Module F3 (a design
+system as reusable tokens and components), j6 (thirty single-file design systems, as taste
+references), b24 (the official design skill); F4 (UI sniping) not used, rule 8.
+
+**Next meaningful step.** Critique and integrate the four branches through pull requests; then
+the host program that installs like an app, the first obstacle on `docs/PATH.md`.
+
 ### 2026-10-29 03:05 CDT (UTC-05:00) (second build run: the privacy goal, sealing, the protected-compute boundary)
 
 **Cooper's direction, received this run, verbatim.** "Orbit's privacy goal is to protect the
