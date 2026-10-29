@@ -25,8 +25,6 @@ The previous builder failed by widening scope, so keep each item to its named fi
 9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly.
 
 ## Later
-- Host program: once the model is loaded, POST `token` to `/api/hosts/ready`. Until it does, no
-  session is ever charged. To test by hand: `curl -X POST -d token=<token> localhost:8000/api/hosts/ready`.
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
 - Branches review/2026-10-28-1717, -1735, -1856, -1923 and escalate/2026-10-28-1856 are
   swarm attempts at the host program, now merged by hand. Cooper can delete them.
@@ -58,3 +56,6 @@ The previous builder failed by widening scope, so keep each item to its named fi
   item main never learned was stuck. The critic's reasons now show in the swarm window.
 - Swarm builder uses Aider's diff edit format, so editing `orbit/app.py` fits the local model's
   16k context. The whole format overflowed it and the builder changed nothing.
+- Host program runs the model: when the heartbeat names a session it starts `llama serve -hf`
+  on port 8081, posts `/api/hosts/ready` once it answers, and stops it when the session ends.
+  It reads the session from the heartbeat reply, so it waits on Now item 1 to do anything.
