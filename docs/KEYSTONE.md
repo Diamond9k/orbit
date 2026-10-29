@@ -97,6 +97,64 @@ Cooper's yes.
 
 Newest first. Each entry: date, what changed, evidence, what is next.
 
+### 2026-10-29 04:50 CDT (UTC-05:00) (same session: the pause, Cooper's correction, the fleet revised)
+
+**Cooper's correction, 04:05, verbatim where it binds.** "Pause the current fleet and preserve all
+work already completed. Do not delete branches, reset worktrees, or stop the local model server."
+"Local open-source models on my own hardware are the default for daily work. Before launching any
+Claude subagent, ask: can a local model do this task to an acceptable standard? If we don't know,
+run a small, bounded test and measure the result. Do not launch parallel paid or plan-usage Claude
+agents by default. Use one only when local work has failed, the task requires capabilities we
+cannot reasonably verify locally, or independent review is needed for sensitive work. Tell me what
+it will do and why it is worth the usage before starting it." "Redesign the fleet around one
+director, local workers, bounded attempts, and independent checks. Test one local task before
+scaling up. Track useful work completed, failures, time, and Claude usage." "Do not restart the
+fleet until you have shown me the revised setup." Minutes earlier: "I want to always first think
+'can we run the ai model that needs to be ran for the desired outcome using open source models on
+personal compute for zero cost'".
+
+**What Keystone had done wrong.** Launched four Fable 5.1 agents in parallel at 03:50, each with a
+budget of one to two hours, on Cooper's shared plan limits, and said which model only in the
+record, not in chat. Measured usage before the pause: T3 154,524 tokens, T4 151,965; T1 and T2
+unmeasured (killed).
+
+**The pause, 04:05.** All agents stopped; nothing deleted; the model server untouched. T1's
+unfinished UI work saved as a WIP commit (`f9b423a`, `keystone/ui`, 11 files, tests pass, not
+reviewed). T2 had produced nothing on either model. T4's report filed on `keystone/fleet`. T3 done.
+
+**T3 reviewed by the director, and widened.** The builder's nonce finding was correct and larger
+than it said: `accept()` reset the counters on any repeated hello, so the ordinary page reload
+(key pair restored, log replayed, hello re-sent) made the host reuse an AES-GCM nonce and refuse
+the next message. Fixed on both ends with no wire change: a hello with the current peer key is a
+no-op, a key from an earlier epoch is refused; a reload is now played end to end by the real
+`seal.js` under Node. Pull request 26, 73 tests. It waits for an independent second review, as
+Cooper's rule asks for security changes.
+
+**The fleet, revised.** `docs/FLEET.md`: one director (this session, not always on); local workers
+(the 14B through llama.cpp, one slot) for small tasks with named files and tests written first;
+scripts for everything that needs no model; a stronger model last, one at a time, announced, with
+its usage recorded. Bounded attempts: one build, one fix, time-boxed, then escalation. Checks the
+builder does not control: tests here and on GitHub, a scope check, the local critic, the
+director's read; a stronger-model review for money, sessions and the host program. Tracking:
+`docs/evidence/fleet-ledger.md`, one row per piece of work, summed per worker by `swarm/ledger.py`.
+
+**A limit met.** This session's permission classifier refuses to launch aider with `--yes-always`
+("Create Unsafe Agents"), so the director cannot start the swarm's own loop. Instead the director
+drives the local model through plain chat calls: spec and tests first, the model answers with one
+complete file, the director writes it and runs the tests, two attempts at most. That is the first
+bounded test (T6, the ledger tool); its result is in the ledger.
+
+**Evidence, by kind.** Code-supported: 73 tests on `keystone/seal-adversary`, 56 on
+`keystone/fleet`, 53 on the paused `keystone/ui`. Controlled: nothing new. Real people: none.
+
+**Decisions now Cooper's.** Approve or amend the revised setup before anything restarts. Who gives
+pull request 26 its second review. What becomes of the paused UI branch: resume page by page with
+the local worker under the director's eye, or one announced Claude agent. Whether the privacy
+research is done by the director in pieces. Merge or send back pull request 25.
+
+**Next meaningful step.** After Cooper's go: local tasks one at a time through the ladder, the
+host-as-an-app build first.
+
 ### 2026-10-29 03:45 CDT (UTC-05:00) (third run: crash recovery, the merges, the fleet)
 
 **What happened between runs.** Cooper merged pull requests 22, 23 and 24 himself; main is
