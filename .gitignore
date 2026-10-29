@@ -14,3 +14,4 @@ workspace/runs/*
 workspace/state.json
 workspace/ESCALATE.md
 swarm/STOP
+host/token.txt
