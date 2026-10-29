@@ -32,8 +32,9 @@ On Cooper's PC the `llama` command is version 0.7.0-dev, build 11941, a 51 MB ex
   37.3 MB (the one an RX 580 needs), `llama-b11981-bin-win-cpu-x64.zip` 24.4 MB,
   `llama-b11981-bin-win-rocm-10.0-x64.zip` 264.9 MB, `llama-b11981-bin-win-cuda-13.4-x64.zip`
   165.0 MB plus a 423.5 MB `cudart` archive. There is also a `v0.8.0` tag with three assets
-  (not binaries). Whether the releases publish checksums was not checked; if they do not, Orbit
-  must pin the SHA-256 of the archive it ships or downloads.
+  (not binaries). Release `b11981` publishes no checksum file and its notes mention none
+  (checked 2026-10-29), so Orbit must record the SHA-256 of the exact archive it ships or
+  downloads, and update it deliberately when llama.cpp moves.
 - Windows shows a SmartScreen warning for an unsigned executable downloaded from the web. A
   code-signing certificate removes it and costs money; the price was not researched.
 
