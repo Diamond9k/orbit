@@ -6,12 +6,6 @@ Add anything else worth doing to Later, one line each. Do not reorder without Co
 ## Now
 The previous builder failed by widening scope, so keep each item to its named files, use stdlib and existing imports only, and never touch requirements.txt.
 
-1. **Heartbeat tells the host what to run.** Files: `orbit/app.py`, `tests/test_app.py`.
-   Change the `POST /api/hosts/heartbeat` 200 reply to JSON. It is `{"session": null}` when the host has no running session.
-   When it has one, it is `{"session": {"id": <session id>, "model": "<model name of that session>"}}`.
-   Keep the existing behavior of marking the host online and the existing error replies.
-   Test: a heartbeat with no session returns `{"session": null}`. After starting a session on that host, a heartbeat returns the session id and the exact model name.
-   Why: the host program can only load the model a stranger chose if Orbit tells it on the heartbeat
 
 ## Then
 5. **Chat screen** inside the session page. Encrypted end to end between the browser and the
@@ -59,3 +53,5 @@ The previous builder failed by widening scope, so keep each item to its named fi
 - Host program runs the model: when the heartbeat names a session it starts `llama serve -hf`
   on port 8081, posts `/api/hosts/ready` once it answers, and stops it when the session ends.
   It reads the session from the heartbeat reply, so it waits on Now item 1 to do anything.
+- Heartbeat reply names the session the host should run: `{"session": {"id", "model"}}` or
+  `{"session": null}`. Built by Keystone after the local builder overflowed its context on it twice.

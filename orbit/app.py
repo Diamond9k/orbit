@@ -371,14 +371,22 @@ def remove_host(hid: int, user=Depends(require_user), conn=Depends(get_db)):
 
 @app.post("/api/hosts/heartbeat")
 def heartbeat(token: str = Form(...), conn=Depends(get_db)):
-    """The host program calls this every minute while it is ready for work."""
+    """The host program calls this every few seconds while it is ready for work.
+
+    The reply names the session this machine should be running, so the host program knows
+    which model to load: {"session": {"id": ..., "model": ...}} or {"session": null}.
+    """
     cur = conn.execute(
         "UPDATE hosts SET last_seen = datetime('now'), status = CASE WHEN status = 'busy' THEN 'busy' ELSE 'online' END "
         "WHERE token = ? AND status != 'removed'", (token,)
     )
     if cur.rowcount == 0:
         raise HTTPException(401, "unknown host token")
-    return {"ok": True}
+    s = conn.execute(
+        "SELECT s.id, s.model FROM sessions s JOIN hosts h ON h.id = s.host_id "
+        "WHERE h.token = ? AND s.ended_at IS NULL", (token,)
+    ).fetchone()
+    return {"session": {"id": s["id"], "model": s["model"]} if s else None}
 
 
 @app.post("/api/hosts/ready")

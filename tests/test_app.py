@@ -30,7 +30,7 @@ def test_full_loop(client):
     assert r.status_code == 200
     import re
     token = re.search(r"<pre[^>]*>(.*?)</pre>", r.text, re.S).group(1).strip()
-    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"ok": True}
+    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"session": None}
     # no money yet: can't start. Friendly redirect back with a message, not an error code.
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
     assert r.status_code == 303 and "orbit_flash" in r.headers.get("set-cookie", "")
@@ -95,6 +95,16 @@ def _start_session(client):
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
     assert r.headers["location"] == "/sessions/1"
     return token
+
+
+def test_heartbeat_names_the_session_to_run(client):
+    token = _start_session(client)
+    # the host program learns the session id and the exact model name from the heartbeat
+    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {
+        "session": {"id": 1, "model": "x/Model-7B-Q4_K_M"}}
+    assert client.post("/api/hosts/heartbeat", data={"token": "nope"}).status_code == 401
+    client.post("/sessions/1/stop", follow_redirects=False)
+    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"session": None}
 
 
 def test_no_charge_before_machine_is_ready(client):
