@@ -46,6 +46,7 @@ The previous builder failed by widening scope, so keep each item to its named fi
 9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly.
 
 ## Later
+- Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
 - Cycle 1 (review/2026-10-28-1717) went to review: GET instead of POST, tests read a real
   file, requirements.txt wiped. Branch can be deleted; item 1 stays on top.
 - Edit a listed machine's price without removing it.
