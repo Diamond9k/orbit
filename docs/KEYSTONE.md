@@ -97,7 +97,7 @@ Cooper's yes.
 
 Newest first. Each entry: date, what changed, evidence, what is next.
 
-### 2026-10-29 04:50 CDT (UTC-05:00) (same session: the pause, Cooper's correction, the fleet revised)
+### 2026-10-29 04:17 CDT (UTC-05:00) (same session: the pause, Cooper's correction, the fleet revised)
 
 **Cooper's correction, 04:05, verbatim where it binds.** "Pause the current fleet and preserve all
 work already completed. Do not delete branches, reset worktrees, or stop the local model server."
@@ -157,9 +157,15 @@ research is done by the director in pieces. Merge or send back pull request 25.
 **Next meaningful step.** After Cooper's go: local tasks one at a time through the ladder, the
 host-as-an-app build first.
 
-**Sign-off, 04:35.** Cooper: "save this going to sleep I will message Keystone in claude terminal chat
+**Sign-off, 04:27.** Cooper: "save this going to sleep I will message Keystone in claude terminal chat
 when the agent should arise". Everything above is pushed; the fleet stays paused; no process of
 Keystone's runs. Keystone does nothing until Cooper's message, then starts from the decisions list.
+
+**Clock correction, 04:30.** This entry's heading said 04:50 and the sign-off 04:35; the commits show
+04:17 and 04:27. The fleet ledger's T3 review row said 04:20 and thirty minutes; T3 finished at
+04:04 and the fix was committed at 04:16, so twelve. The review heading in the sealing evidence
+(04:40) is corrected to 04:16 on its branch. Cause: Keystone estimated times instead of reading the
+clock. Rule from here: every time in this record comes from `date` or a commit timestamp.
 
 ### 2026-10-29 03:45 CDT (UTC-05:00) (third run: crash recovery, the merges, the fleet)
 
