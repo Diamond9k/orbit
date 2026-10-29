@@ -84,6 +84,8 @@ class Sealer:
         self._send_key = self._recv_key = None
         self.sent = 0
         self.received = 0
+        self._peer_raw = None  # the other end's current public key, to spot the same hello again
+        self._seen_peers = set()  # every peer key accepted this session; an old one never comes back
 
     @property
     def ready(self):
@@ -106,6 +108,15 @@ class Sealer:
             peer_key = ec.EllipticCurvePublicKey.from_encoded_point(CURVE, peer_raw)
         except ValueError as e:
             raise SealError("bad public key") from e
+        if self.ready and peer_raw == self._peer_raw:
+            # The same hello again: a page reload, a relay replay, or a broker replaying it on purpose.
+            # The keys would come out identical, so resetting the counters would reuse AES-GCM nonces.
+            # Keep the epoch and the counters exactly as they are.
+            return env.get("att")
+        if peer_raw in self._seen_peers:
+            # A key from an earlier epoch of this session, replayed: accepting it would rebuild that
+            # epoch's keys with the counters at zero, reusing nonces already spent. Refuse.
+            raise SealError("a key from an earlier epoch of this session")
         shared = self._private.exchange(ec.ECDH(), peer_key)
         user_pk, host_pk = (self.public_raw, peer_raw) if self.role == "user" else (peer_raw, self.public_raw)
         salt = hashlib.sha256(LABEL + self.session_id.to_bytes(8, "big") + user_pk + host_pk).digest()
@@ -115,6 +126,8 @@ class Sealer:
             self._send_key, self._recv_key = user_to_host, host_to_user
         else:
             self._send_key, self._recv_key = host_to_user, user_to_host
+        self._peer_raw = peer_raw
+        self._seen_peers.add(peer_raw)
         self.epoch = salt[:8].hex()
         self.sent = self.received = 0
         return env.get("att")

@@ -209,37 +209,25 @@ def test_envelopes_from_a_previous_epoch_are_refused_after_a_rekey():
         host.unseal(old)
 
 
-def test_known_gap_a_replayed_user_hello_resets_the_host_counter_and_reuses_a_gcm_nonce():
-    """Known gap. accept() re-derives the SAME keys from the same two key pairs and resets the
-    counters to zero. So if an active broker replays the user's earlier hello, the host keeps the
-    same AES key but restarts its nonce at 1, reusing a (key, nonce) pair it already used. Under
-    AES-GCM that is a keystream reuse: the XOR of the two ciphertexts equals the XOR of the two
-    plaintexts (shown below), which breaks confidentiality of those messages, and the forced re-key
-    is also a denial-of-service lever (it desynchronises an honest page's counters).
-
-    What would close it, and why it is left open here: the host would have to generate a fresh key
-    pair on every accepted hello and re-offer it, which changes the exchange and the browser side
-    (orbit/static/seal.js) that this task must not touch. It grants no power beyond the known
-    active-broker gap, since any broker that can replay a hello can already substitute keys. It is
-    recorded, with a proposal, in docs/evidence/2026-10-29-seal-adversary.md."""
+def test_fix_a_replayed_user_hello_no_longer_resets_the_host_counter():
+    """Was a known gap (T3, 2026-10-29): accept() re-derived the same keys and reset the counters, so a
+    replayed hello made the host reuse an AES-GCM (key, nonce) pair; the page-reload path did the same
+    by re-sending its own hello. Closed in Keystone's review: a hello carrying the current peer key is
+    a no-op, and a key from an earlier epoch of this session is refused (tests/test_seal_replay.py)."""
     host, user = seal.Sealer(7, "host"), seal.Sealer(7, "user")
     user.accept(host.hello())
     user_hello = user.hello()
     host.accept(user_hello)
     host.unseal(user.seal("q1"))
     first = json.loads(host.seal("answer one, the secret"))
-    epoch_before = host.epoch
+    epoch_before, sent_before, received_before = host.epoch, host.sent, host.received
 
     host.accept(user_hello)  # the active broker replays the user's hello
-    assert host.epoch == epoch_before      # same keys
-    assert host.sent == 0 and host.received == 0  # counters reset: the nonce will restart at 1
+    assert (host.epoch, host.sent, host.received) == (epoch_before, sent_before, received_before)
     second = json.loads(host.seal("answer two, changed!!"))
-    assert first["n"] == second["n"] == 1   # same key, same nonce
-
-    ct1, ct2 = base64.b64decode(first["ct"]), base64.b64decode(second["ct"])
-    body = min(len(ct1), len(ct2)) - 16     # drop the 16-byte GCM tag; the rest is plaintext xor keystream
-    # The shared keystream cancels, leaving the xor of the two plaintexts: the leak, stated as an identity.
-    assert _xor(ct1[:body], ct2[:body]) == _xor(b"answer one, the secret", b"answer two, changed!!")[:body]
+    assert (first["n"], second["n"]) == (1, 2)  # the nonce moves on; nothing is reused
+    assert user.unseal(json.dumps(first)) == "answer one, the secret"
+    assert user.unseal(json.dumps(second)) == "answer two, changed!!"
 
 
 # ---------- 4. attestation handling ----------

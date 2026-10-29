@@ -3,6 +3,8 @@
      in  {"session_id": 7, "host_hello": "<envelope>"}   -> out {"user_hello": "...", "sealed": "...", "att": {...}, "epoch": "..."}
      in  {"open": "<envelope from the host>"}            -> out {"text": "..."}
      in  {"seal": "plain text"}                          -> out {"sealed": "..."}
+     in  {"export": true}                                -> out {"saved": {...}, "pk": "..."}
+     in  {"restore": {...}, "session_id": 7}            -> out {"pk": "...", "ready": false}   (a page reload)
      in  {"accept": "<another host hello>"}              -> out {"att": {...}, "epoch": "...", "user_hello": "...", "sent": 0, "received": 0}
          (the sealer already made takes a further hello: a re-key, or a replay; tests/test_seal_adversary.py)
    Any error -> out {"error": "..."} */
@@ -26,6 +28,11 @@ async function handle(line) {
   if (req.accept !== undefined) {
     const att = await sealer.accept(req.accept);
     return {att: att, epoch: sealer.epoch, user_hello: sealer.hello(), sent: sealer.sent, received: sealer.received};
+  }
+  if (req.export !== undefined) return {saved: await sealer.export(), pk: sealer.publicB64};
+  if (req.restore !== undefined) {  // a page reload: the same key pair comes back from sessionStorage, nothing else
+    sealer = await OrbitSeal.restore(req.session_id, 'user', req.restore);
+    return {pk: sealer.publicB64, ready: sealer.ready()};
   }
   if (req.open !== undefined) return {text: await sealer.unseal(req.open)};
   if (req.seal !== undefined) return {sealed: await sealer.seal(req.seal)};

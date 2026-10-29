@@ -22,6 +22,12 @@
     for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return out;
   }
+  function sameBytes(a, b) {
+    if (a.length !== b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+    return diff === 0;
+  }
   function concat() {
     var n = 0, i, out, off = 0;
     for (i = 0; i < arguments.length; i++) n += arguments[i].length;
@@ -74,6 +80,9 @@
     var env = typeof envelope === 'string' ? parse(envelope) : envelope;
     if (!env || env.t !== 'hello' || env.from !== this.peer) throw new Error('not a hello from the other end');
     var peerRaw = b64d(env.pk);
+    if (this.ready() && this.peerRaw && sameBytes(peerRaw, this.peerRaw)) return env.att;  // the same hello again: keep keys and counters (no nonce reuse)
+    var seenB64 = b64e(peerRaw);
+    if ((this.seenPeers || []).indexOf(seenB64) >= 0) throw new Error('a key from an earlier epoch of this session');  // replayed: nonces already spent
     var peerKey = await subtle.importKey('raw', peerRaw, {name: 'ECDH', namedCurve: 'P-256'}, false, []);
     var shared = new Uint8Array(await subtle.deriveBits({name: 'ECDH', public: peerKey}, this.keyPair.privateKey, 256));
     var userPk = this.role === 'user' ? this.publicRaw : peerRaw;
@@ -85,6 +94,8 @@
     var hostToUser = await subtle.importKey('raw', okm.slice(32, 64), 'AES-GCM', false, ['encrypt', 'decrypt']);
     if (this.role === 'user') { this.sendKey = userToHost; this.recvKey = hostToUser; }
     else { this.sendKey = hostToUser; this.recvKey = userToHost; }
+    this.peerRaw = peerRaw;
+    this.seenPeers = (this.seenPeers || []).concat([seenB64]);
     this.epoch = hex(salt.slice(0, 8));
     this.sent = this.received = 0;
     return env.att;

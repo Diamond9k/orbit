@@ -19,7 +19,7 @@ Node 24 present, so the interop tests ran, not skipped).
 | 2a | Envelope sealed for session 7 opened in session 8, even reusing the same key pairs | FAILS | `test_an_envelope_for_session_7_cannot_open_in_session_8_even_with_the_same_keys` | Already closed: the HKDF salt commits `session_id.to_bytes(8)`. |
 | 2b | A hello captured in session 7 replayed into a host serving session 8, to get a usable key | FAILS | `test_a_hello_replayed_into_another_session_does_not_yield_a_usable_key` | Already closed by each end mixing its own `session_id` into the salt. See the note below on what the hello does *not* bind. |
 | 3a | Replay an old-epoch envelope after a re-key | FAILS | `test_envelopes_from_a_previous_epoch_are_refused_after_a_rekey` | Already closed: the epoch is in the AAD and the key changed. |
-| 3b | Active broker replays the user's hello to force a host re-key | SUCCEEDS (known gap): same key, counters reset, GCM nonce reused; also a DoS lever | `test_known_gap_a_replayed_user_hello_resets_the_host_counter_and_reuses_a_gcm_nonce` | Host would generate a fresh key pair per accepted hello and re-offer it — a change to the exchange and to `seal.js`, out of scope here. Grants no power beyond 1a (a replaying broker can already substitute keys). |
+| 3b | Active broker replays the user's hello to force a host re-key | CLOSED in Keystone's review (was: SUCCEEDED; same key, counters reset, GCM nonce reused; the ordinary page reload hit the same path by re-sending its own hello) | `test_fix_a_replayed_user_hello_no_longer_resets_the_host_counter`; `tests/test_seal_replay.py` (both ends, the host loop, a reload played by the real `seal.js` under Node) | Closed on this branch: a hello carrying the current peer key is a no-op, a key from an earlier epoch of the session is refused. No wire change. |
 | 4 | Host hello claims `{"kind":"verified"}` (or any kind) to be trusted | FAILS to gain trust: `att` is carried verbatim, no code path reads it for trust | `test_an_att_field_claiming_verified_is_carried_but_grants_no_trust`; Node passthrough `test_the_browser_carries_the_att_field_through_unchanged_under_node` | Nothing to close; this is correct. Trust will come only when a verifier checks the field (verified tier). |
 | 5 | After sealing, user side sends plain text; host answers in plaintext (silent downgrade) | CLOSED by this branch (was: succeeded). Host posts a plain notice, does not ask the model, stays sealed | `test_a_plain_message_after_the_session_is_sealed_is_not_downgraded`; and `tests/test_host.py::test_runner_seals_the_conversation_when_the_browser_answers` | Closed in part B below. |
 | 6 | Host owner reads the conversation plaintext | SUCCEEDS (by design, community tier) | `test_the_host_transcript_holds_the_plaintext_by_design` | Only an attested enclave (verified tier) the browser checks; impossible on consumer hardware (docs/PRIVACY.md). |
@@ -113,3 +113,23 @@ against an active Orbit.
   a second pair of eyes before any claim rests on it.
 - Nothing here bears on the verified tier, attested enclaves, or physical attacks; those remain as
   docs/PRIVACY.md describes them.
+
+## Keystone's review (2026-10-29 04:40)
+
+Read the diffs and this document, re-ran the suite (69 passed), and checked row 3b by hand. The
+finding is correct and it is wider than the builder said: the page-reload path (`session.html`
+restores its key pair from sessionStorage, replays the log, and re-sends the same hello) made the
+host reset its counters too, so after a reload the host's next answer reused a nonce and the user's
+next message was refused as out of order. No active broker needed.
+
+The fix does not change the wire format. `accept()` on both ends now treats a hello carrying the
+peer key already in use as a no-op (keys and counters untouched) and refuses a peer key seen in an
+earlier epoch of the same session (`SealError` in Python, an `Error` in `seal.js`); the host
+program's relay loop survives the refusal. New tests: `tests/test_seal_replay.py` (the no-op on
+both ends, the refusal on both ends, the host loop, and a full reload played by the real `seal.js`
+under Node, asserting the counters continue at 3 and 2 instead of restarting at 1). The old
+known-gap test is rewritten as `test_fix_...`. Suite: 73 passed.
+
+Still open, unchanged: 1a (an active Orbit substituting keys) and 6 (the host reads plaintext).
+This review was done by the director, not by a second independent reviewer; Cooper's rule asks for
+one on security changes, so this branch waits for that before merging.
