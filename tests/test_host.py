@@ -1,13 +1,15 @@
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from host.orbit_host import send_heartbeat
 import urllib.error
 
 class TestHost(unittest.TestCase):
     @patch('urllib.request.urlopen')
     def test_send_heartbeat_success(self, mock_urlopen):
-        mock_response = unittest.mock.Mock()
+        mock_response = Mock()
         mock_response.status = 200
+        mock_response.__enter__ = lambda self: self
+        mock_response.__exit__ = lambda self, exc_type, exc_value, traceback: None
         mock_urlopen.return_value = mock_response
         result = send_heartbeat("abc")
         self.assertTrue(result)
