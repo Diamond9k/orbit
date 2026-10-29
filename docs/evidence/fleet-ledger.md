@@ -7,3 +7,4 @@
 | 2026-10-29 04:04 | T2 privacy research | claude:sonnet | 1 | failed | stopped 04:05 at Cooper's pause; nothing on the branch |
 | 2026-10-29 04:20 | T3 review and nonce-reuse fix | keystone | 30 | accepted | PR 26; reload path fixed on both ends; 73 tests; needs a second reviewer |
 | 2026-10-29 04:11 | T6 ledger tool (first bounded local task) | local | 8 | accepted | 2 attempts, 432 s model time, 4,609 in + 1,344 out tokens, cost 0; 6/7 then 7/7 after the director's test was corrected; PR 27 |
+| 2026-10-29 16:35 | T7 spec: tests and prompt for host/adopt.py, wiring tests | keystone | 13 | accepted | b2d4a9d on local/host-adopt; 13 + 5 tests written first; worker not run yet, model server down |

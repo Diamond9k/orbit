@@ -33,25 +33,27 @@ session, a closed window and a model that forgets. Conversation memory is not st
   session charges are idempotent (`post_session_charge`, `sweep`), Stripe credits key on the
   event id, and the payout path, when built, must key on a `payout:<id>` memo the same way.
 
-## Services on this PC (2026-10-29, verified by port)
+## Services on this PC (2026-10-29 16:35, verified by port)
 
-| Port | What | Owner | Touch? |
+| Port | What | Owner | State at 16:35 |
 |---|---|---|---|
-| 8000 | Orbit app, pre-sealing code (worktree `main-ro` at 5eb4994) on Cooper's dev database | peer session | no |
-| 5400 | Operator console (separate project) | peer session | no |
-| 5500 | Launcher (separate project) | peer session | no |
-| 8080 | llama.cpp serving Qwen2.5-Coder-14B Q4_K_M on the RX 580 (4.8 GB of 8 GB) | peer session's background job | no; may stop when that session ends |
-| 9222 | Headless Chromium (REA capture) | peer session | no |
-| 8020, 8030 | Fleet test instances, isolated databases | T1, T3 | theirs |
+| 8000 | Orbit app, pre-sealing code (worktree `main-ro` at 5eb4994) on Cooper's dev database | peer session | not listening; the peer session is gone |
+| 5400 | Operator console (separate project) | peer session | not listening |
+| 5500 | Launcher (separate project) | peer session | not listening |
+| 8080 | llama.cpp serving Qwen2.5-Coder-14B Q4_K_M on the RX 580 | whoever starts it | not listening; Keystone asks Cooper before starting it (`docs/FLEET.md`); command in `docs/SWARM.md` |
+| 9222 | Headless Chromium (REA capture) | peer session | not listening |
+| 8020, 8030 | Fleet test instances, isolated databases | T1, T3 | free |
 
-The swarm (`swarm/forever.sh`) is idle. Keystone does not start or stop it.
+The swarm (`swarm/forever.sh`) is idle. Keystone does not start or stop it. The GPU held about
+1 GB of its 8 at 16:35 (desktop), 20.7 GB of RAM free.
 
 ## Tasks
 
 | Id | Task | Owner | Branch / worktree | Acceptance | Status | Evidence |
 |---|---|---|---|---|---|---|
-| T0 | Record, board, path map, pull requests, integration | Keystone | `keystone/fleet` in `orbit` | record entry pushed; this board true; PRs open with evidence | running; fleet paused by Cooper 04:05, redesign in `docs/FLEET.md` | `docs/KEYSTONE.md` |
+| T0 | Record, board, path map, pull requests, integration | Keystone | `keystone/fourth-run` in `orbit` | record entry pushed; this board true; PRs open with evidence | running; fourth run woken by Cooper 16:35; `docs/FLEET.md` merged (PR 25) | `docs/KEYSTONE.md` |
 | T6 | The fleet ledger tool, `swarm/ledger.py`, from tests written first | local 14B via aider | `local/ledger` in `local-ledger` | `tests/test_ledger.py` green; only the named file changed; under 80 lines | done 04:18, accepted; PR 27 | `docs/evidence/fleet-ledger.md` |
+| T7 | The host program adopts or stops a model server left by a crash: `host/adopt.py` (worker) and the `Runner` wiring (director) | local 14B via `swarm/local_task.py`; Keystone wires | `local/host-adopt` in `local-host-adopt` | `tests/test_adopt.py` (13) and the five T7 tests in `tests/test_host.py` green; only the named files changed; module under 130 lines; two attempts at most | spec committed 16:48 (b2d4a9d); waits for the model server on 8080 | `docs/evidence/2026-10-29-T7-host-adopt.md` |
 | T1 | Whole-product visual design: tokens, icon rail, purple accent, depth, motion, logo at 16/24/32, every page and state, explicit consent before sending unsealed | fleet agent (Claude) | `keystone/ui` in `keystone-ui` | tests green; screenshots at 320/390/1280 with measured zero overflow; contrast numbers; keyboard and reduced motion; no new deps; honest copy intact | paused by Cooper 04:05; WIP f9b423a pushed, not reviewed | `docs/evidence/2026-10-29-ui-overhaul.md`, `docs/evidence/ui/2026-10-29/` |
 | T2 | Protected-compute research: authenticated transport and code delivery, attested CPU+GPU, Bifrost/Maverick/FHE; licenses, hardware, measured vs projected | fleet agent (Claude) | `keystone/privacy-boundary` in `keystone-privacy-boundary` | every claim sourced and dated; comparison table; proposal for Cooper; unknowns listed | not started: stopped 04:03 (Fable) and 04:05 (Sonnet, at the pause) | `docs/evidence/2026-10-29-privacy-research.md` |
 | T3 | Adversary tests against the real sealing code; host no longer answers plaintext after sealing | fleet agent (Claude) | `keystone/seal-adversary` in `keystone-seal-adversary` | tests for each adversary action, gaps named `known_gap`; host downgrade closed and tested; evidence table | done 04:04, 69 tests; Keystone's review pending | `docs/evidence/2026-10-29-seal-adversary.md` |
@@ -67,3 +69,8 @@ The swarm (`swarm/forever.sh`) is idle. Keystone does not start or stop it.
   call or yours; two app versions must not share `orbit.db`.
 - Ruleset 26085278 on `main` still requires no status check and no review; a push from an
   account with write access could land on main. Keystone's question 3 in `docs/KEYSTONE.md`.
+- The model server on 8080 is down (16:35). T7 and every later local task need it. Say yes and
+  Keystone starts it in its own window with the `docs/SWARM.md` command; or start it yourself.
+- Pull request 26 (sealing: adversary tests, no silent downgrade, nonce-reuse fix) was merged
+  without the independent second review its description asked for. Choose: Codex, one announced
+  Claude agent (Opus or Fable, as a security judgement), or none.

@@ -97,6 +97,56 @@ Cooper's yes.
 
 Newest first. Each entry: date, what changed, evidence, what is next.
 
+### 2026-10-29 16:35 CDT (UTC-05:00) (fourth run: woken by Cooper's message)
+
+**Wake.** Cooper's message in the terminal chat, "wake up keystone", read at 16:35 by this PC's
+clock, twelve hours after the sign-off. A new session, as the record intends; nothing of
+Keystone's ran in between.
+
+**What Cooper decided while Keystone slept, read from GitHub.** Pull requests 25, 26 and 27 were
+merged at 04:28 (33d6ee2, 7644de5, f7996dc; no comments and no reviews on their pages). So
+`docs/FLEET.md` is on main (the revised setup, accepted by merge); pull request 26 is on main
+without the independent second review its description asked for; the fleet ledger tool and its
+driver are on main. Main is f7996dc and its 78 tests pass on this PC (16:40). Still open: who gives
+the sealing changes their second review, now a review after the merge; the paused UI branch; the
+privacy research; the thirteen stale branches, still on origin at 16:35.
+
+**Ground truth at 16:35, by port and process.** Nothing listens on 8000, 5400, 5500, 8080 or 9222:
+the peer session's app, console, launcher and headless browser and the model server are all gone
+(no process; not a crash of Keystone's). The GPU holds about 1 GB of its 8 for the desktop and
+20.7 GB of RAM is free, so the model server could run; `docs/FLEET.md` says Keystone asks Cooper
+before starting one, so it has not been started. All seven worktrees are clean. Three node
+processes belong to other tools (two `server.js`, one Codex runtime); not touched.
+
+**What changed this run.** Worktree `local-host-adopt`, branch `local/host-adopt` from main: the
+spec for T7, the host program adopting or stopping a model server left by a crash (`docs/NEXT.md`
+Later; the first thing the host program must do before it ships as an app,
+`docs/decisions/2026-10-29-host-program-as-an-app.md`). Tests first, committed at 16:48 (b2d4a9d):
+thirteen in `tests/test_adopt.py` for the worker's new module `host/adopt.py`, five at the end of
+`tests/test_host.py` for the director's wiring, `tests/conftest.py` keeping the pid file out of the
+repository, the prompt saved with the run and verbatim in `docs/evidence/2026-10-29-T7-host-adopt.md`.
+The worker is the local 14B through `swarm/local_task.py`, as in T6; the split (a new module under
+130 lines for the worker, about twenty lines of wiring for the director) follows T6's measured rate
+of about three minutes per seventy lines. The branch is red until the module exists (two test files
+import it) and is not pushed. Branch `keystone/fourth-run` in the nested clone: this entry, the
+board, the ledger.
+
+**Found while writing the spec, not fixed.** `model_server_up` trusts any server that answers
+health on the port, so a stranger's server there could mark the host ready for a model it does not
+run. Written in the T7 evidence file; goes to `docs/NEXT.md` Later with the T7 pull request.
+
+**Evidence, by kind.** Code-supported: 78 tests on main on this PC; the T7 tests exist, their
+module does not yet. Controlled: nothing new. Real people: none.
+
+**Decisions now Cooper's.** (1) Start the model server for the local worker, yes or no; Keystone
+can start it in its own window with the `docs/SWARM.md` command so it outlives this session.
+(2) The second review of pull request 26, now merged: Codex, one announced Claude agent (Opus or
+Fable; it is a security judgement), or none. (3) The paused UI branch and the privacy research,
+unchanged from the 04:50 entry. (4) The thirteen stale branches: the command in `docs/BOARD.md`.
+
+**Next meaningful step.** On the first yes: run T7 on the local model, wire it, push, open the pull
+request. Then the host program as an app (option A, Windows; needs decisions 1 and 4 of its proposal).
+
 ### 2026-10-29 04:50 CDT (UTC-05:00) (same session: the pause, Cooper's correction, the fleet revised)
 
 **Cooper's correction, 04:05, verbatim where it binds.** "Pause the current fleet and preserve all
