@@ -151,7 +151,14 @@ an independent critic for T1 and T3, waits on them. Local open models were not u
 the 14B coder is adequate for small scoped edits (the swarm's job) and not for design or
 security judgement; no paid API call was made.
 
-**Evidence, by kind.** Code-supported: main's tests. Controlled: nothing new yet this run.
+**Evidence, by kind.** Code-supported: main's tests, plus three interruption tests in
+`tests/test_recovery.py` (a restarted host program does not restart the clock, a restarted Orbit
+keeps the running session and its messages, a repeated stop bills once); 56 pass. A mistake,
+repaired: that file run on its own used the default database, so a synthetic user and machine
+landed in Cooper's dev `orbit.db` at 03:50 for a few minutes; both rows were listed and removed,
+nothing else was touched, and `tests/conftest.py` now pins every test to the throwaway database.
+`docs/decisions/2026-10-29-host-program-as-an-app.md` proposes how the host program ships
+(llama.cpp is MIT; its Windows Vulkan build is 37 MB). Controlled: nothing new yet this run.
 Real people: none. Everything above about the fleet is assignment, not result; results go in
 the next entry with the pull request numbers.
 
