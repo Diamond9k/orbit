@@ -7,15 +7,21 @@
 #
 # Before each cycle it waits for the previous build/ branch to merge on GitHub, so the
 # director never plans on top of work that has not landed, and deletes merged build/ branches.
-# A build/ branch that has not merged after 30 minutes is deleted; the next cycle redoes it.
+# A build/ branch that has not merged after 30 minutes is kept: it is renamed to
+# review/<stamp>-stuck so a person can look, and the swarm moves on. Nothing unmerged is deleted.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 BASE="${BASE:-main}"
 PY="${PYTHON:-python}"
 LOG="workspace/runs/forever.log"
 mkdir -p workspace/runs
-rm -f swarm/STOP
 say() { echo "$(date '+%Y-%m-%d %H:%M') $*" | tee -a "$LOG"; }
+
+if [ -f swarm/STOP ]; then
+  # A STOP left from before means someone asked for the swarm to stay off. Starting it again is
+  # a deliberate act: delete the file first.
+  say "swarm/STOP exists. Delete it to start the swarm."; exit 1
+fi
 
 pending_builds() {
   git fetch -q --prune origin
@@ -28,15 +34,24 @@ pending_builds() {
   done
 }
 
+set_aside() {
+  # Keep an unmerged build/ branch under review/ and take it out of the swarm's way.
+  local b="$1" kept="review/${1#build/}-stuck"
+  git push -q origin "refs/remotes/origin/$b:refs/heads/$kept" && git push -q origin --delete "$b" \
+    && say "kept $b as $kept (not merged after 30 min; nothing deleted)" \
+    && printf '\n## %s did not merge\n\nKept as %s. Check that auto-merge is allowed and main requires the tests check.\n' "$b" "$kept" >> workspace/ESCALATE.md
+}
+
 say "swarm started"
+unfinished="$("$PY" swarm/state.py unfinished)"
+[ -n "$unfinished" ] && say "the previous cycle $unfinished began and never finished; see workspace/runs/$unfinished.md"
 while [ ! -f swarm/STOP ]; do
   waited=0
   while [ -n "$(pending_builds)" ] && [ ! -f swarm/STOP ]; do
     [ "$waited" -eq 0 ] && say "waiting for $(pending_builds | tr '\n' ' ')to merge on GitHub"
     sleep 60; waited=$((waited + 60))
     if [ "$waited" -ge 1800 ]; then
-      say "gave up after 30 min on $(pending_builds | tr '\n' ' '): deleted. Check that auto-merge is allowed and main requires the tests check."
-      for b in $(pending_builds); do git push -q origin --delete "$b"; done
+      for b in $(pending_builds); do set_aside "$b"; done
       waited=0
     fi
   done
@@ -52,5 +67,4 @@ while [ ! -f swarm/STOP ]; do
   if bash swarm/run.sh; then say "cycle finished"; else say "cycle failed, continuing"; fi
   if [ -f workspace/ESCALATE.md ] && [ -s workspace/ESCALATE.md ]; then say "escalations waiting in workspace/ESCALATE.md"; fi
 done
-say "swarm stopped"
-rm -f swarm/STOP
+say "swarm stopped. Delete swarm/STOP to allow it to start again."

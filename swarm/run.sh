@@ -29,7 +29,8 @@ DIRECTOR_MODEL="${DIRECTOR_MODEL:-claude-opus-5-5}"
 CRITIC_MODEL="${CRITIC_MODEL:-claude-opus-5-5}"
 STRANGER_MODEL="${STRANGER_MODEL:-local}"
 SENSITIVE='^(orbit/app\.py|orbit/db\.py|host/|orbit/templates/session\.html)'
-PROTECTED='^(requirements.*\.txt|CLAUDE\.md|\.github/|swarm/|prompts/|\.aider\.conf\.yml|orbit/ledger\.py)'
+PROTECTED='^(requirements.*\.txt|CLAUDE\.md|\.github/|swarm/|prompts/|\.aider\.conf\.yml|orbit/ledger\.py|docs/KEYSTONE\.md|docs/decisions/|\.claude/)'
+AIDER_TIMEOUT="${AIDER_TIMEOUT:-2400}"  # seconds one builder, fixer or critic call may take before the cycle moves on
 
 if ! curl -s -o /dev/null http://127.0.0.1:8080/v1/models; then
   echo "No model server on port 8080. Start llama-server first (docs/SWARM.md)." >&2; exit 1
@@ -37,6 +38,7 @@ fi
 
 mkdir -p workspace/runs
 { echo "# Swarm run $STAMP"; echo "Base: $BASE  Branch: $BRANCH"; } > "$RUN"
+"$PY" swarm/state.py begin "$STAMP" | tee -a "$RUN"  # a cycle that begins and never ends is visible next time
 
 git fetch -q origin "$BASE"
 git checkout -q -B "$BRANCH" "origin/$BASE"
@@ -62,7 +64,7 @@ ITEM="$("$PY" swarm/state.py top)"
 echo -e "\nItem: $ITEM" >> "$RUN"
 
 echo -e "\n## Builder (local)\n" >> "$RUN"
-aider --yes-always --message-file prompts/builder.md --no-show-model-warnings 2>&1 | tee -a "$RUN"
+timeout "$AIDER_TIMEOUT" aider --yes-always --message-file prompts/builder.md --no-show-model-warnings 2>&1 | tee -a "$RUN"
 if [ -n "$(git status --porcelain)" ]; then git add -A && git commit -q -m "swarm: leftover changes from $STAMP"; fi
 
 echo -e "\n## Tests\n" >> "$RUN"
@@ -70,7 +72,7 @@ if "$PY" -m pytest -q 2>&1 | tee workspace/runs/last-tests.txt | tee -a "$RUN"; 
 
 if [ "$TESTS" = fail ]; then
   echo -e "\n## Fixer (local)\n" >> "$RUN"
-  aider --yes-always --read workspace/runs/last-tests.txt --message-file prompts/fixer.md --no-show-model-warnings 2>&1 | tee -a "$RUN"
+  timeout "$AIDER_TIMEOUT" aider --yes-always --read workspace/runs/last-tests.txt --message-file prompts/fixer.md --no-show-model-warnings 2>&1 | tee -a "$RUN"
   if [ -n "$(git status --porcelain)" ]; then git add -A && git commit -q -m "swarm: fixer changes from $STAMP"; fi
   echo -e "\n## Tests after fixer\n" >> "$RUN"
   if "$PY" -m pytest -q 2>&1 | tee -a "$RUN"; then TESTS=pass; else TESTS=fail; fi
@@ -83,14 +85,17 @@ else
 fi
 
 echo -e "\n## Critic (local)\n" >> "$RUN"
-CRITIC_OUT="$(aider --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
+CRITIC_OUT="$(timeout "$AIDER_TIMEOUT" aider --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
 echo "$CRITIC_OUT"
 if echo "$CRITIC_OUT" | grep -qi "nothing found"; then CRITIC=clean; else CRITIC=flagged; fi
+if [ -z "$(git diff --name-only "origin/$BASE"..HEAD)" ]; then
+  CRITIC=empty; echo "Nothing to review: the diff is empty. 'Nothing found' on nothing is not a clean critic." | tee -a "$RUN"
+fi
 
 if [ "$CRITIC" = clean ] && [ "$TESTS" = pass ] && [ "$GUARD" = ok ] && [ -n "${ANTHROPIC_API_KEY:-}" ] \
    && git diff --name-only "origin/$BASE"..HEAD | grep -Eq "$SENSITIVE"; then
   echo -e "\n## Critic, final say ($CRITIC_MODEL): the change touches money, sessions or the host program\n" >> "$RUN"
-  CRITIC_OUT="$(aider --model "$CRITIC_MODEL" --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
+  CRITIC_OUT="$(timeout "$AIDER_TIMEOUT" aider --model "$CRITIC_MODEL" --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
   echo "$CRITIC_OUT"
   if echo "$CRITIC_OUT" | grep -qi "nothing found"; then CRITIC=clean; else CRITIC=flagged; fi
 fi
@@ -121,4 +126,5 @@ if [ "${FAILS:-0}" -ge 2 ]; then
 fi
 
 { echo -e "\n## Result"; echo "Item: $ITEM"; echo "Tests: $TESTS"; echo "Critic: $CRITIC"; echo "Guard: $GUARD"; echo "Fails on this item: ${FAILS:-0}"; echo "Branch: $BRANCH"; } >> "$RUN"
+"$PY" swarm/state.py end "$STAMP" "tests=$TESTS critic=$CRITIC guard=$GUARD branch=$BRANCH"
 echo "Run written to $RUN"
