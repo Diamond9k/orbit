@@ -1,16 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Sign in · Orbit{% endblock %}
+{% block page_title %}Sign in{% endblock %}
 {% block body %}
-<div class="row justify-content-center"><div class="col-md-6 col-lg-5">
-  <div class="card mt-4"><div class="card-body p-4">
-    <h1 class="h3 mb-3">Sign in</h1>
-    {% if error %}<div class="alert alert-danger py-2">{{ error }}</div>{% endif %}
+<div class="o-narrow">
+  <div class="o-panel"><div class="o-panel__body">
+    <h1 class="o-h1 mb-3">Sign in</h1>
+    {% if error %}<div class="o-alert o-alert--danger" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i><div>{{ error }}</div></div>{% endif %}
     <form method="post" action="/login">
-      <div class="mb-3"><label class="form-label" for="email">Email</label><input class="form-control form-control-lg" id="email" type="email" name="email" required autocomplete="email"></div>
-      <div class="mb-3"><label class="form-label" for="password">Password</label><input class="form-control form-control-lg" id="password" type="password" name="password" required autocomplete="current-password"></div>
-      <button class="btn btn-primary btn-lg w-100">Sign in</button>
+      <div class="o-field"><label class="o-label" for="email">Email</label><input class="o-input o-input--lg" id="email" type="email" name="email" required autocomplete="email" {% if error %}aria-invalid="true"{% endif %}></div>
+      <div class="o-field"><label class="o-label" for="password">Password</label><input class="o-input o-input--lg" id="password" type="password" name="password" required autocomplete="current-password" {% if error %}aria-invalid="true"{% endif %}></div>
+      <button class="o-btn o-btn--primary o-btn--lg o-btn--block" type="submit" data-loading="Signing in…">Sign in</button>
     </form>
-    <p class="text-secondary text-center mt-3 mb-0">New here? <a href="/signup">Get started</a></p>
+    <p class="o-muted text-center mt-3 mb-0">New here? <a href="/signup">Get started</a></p>
   </div></div>
-</div></div>
+</div>
 {% endblock %}

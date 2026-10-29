@@ -1,34 +1,44 @@
 {% extends "base.html" %}
 {% block title %}Add time · Orbit{% endblock %}
+{% block page_title %}Add time{% endblock %}
 {% block body %}
-<div class="row justify-content-center"><div class="col-lg-8">
-  <h1 class="h2 mb-1">Add hardware time</h1>
-  <p class="text-secondary mb-4">You have <strong class="text-body">{{ balance | dollars }}</strong>.
-  {% if cheapest %}The cheapest machine online right now is {{ cheapest | dollars }} an hour.{% else %}No machines are online right now.{% endif %}</p>
-
-  {% if stripe_ready %}
-  <div class="row g-3 mb-3">
-    {% for a in amounts %}
-    <div class="col-sm-4"><form method="post" action="/store/checkout" class="card h-100 text-center">
-      <div class="card-body d-flex flex-column">
-        <div class="stat-n mb-1">{{ a | dollars }}</div>
-        <div class="text-secondary small flex-grow-1 mb-3">{% if cheapest %}about {{ (a * 60 // cheapest) }} minutes on the cheapest machine{% else %}&nbsp;{% endif %}</div>
-        <input type="hidden" name="amount_cents" value="{{ a }}">
-        <button class="btn btn-primary w-100">Pay by card</button>
-      </div>
-    </form></div>
-    {% endfor %}
+<div class="o-mid">
+  <div class="o-page-head">
+    <div>
+      <h1 class="o-h1">Add hardware time</h1>
+      <p class="o-sub">You have <strong class="o-mono" style="color:var(--o-text)">{{ balance | dollars }}</strong>.
+      {% if cheapest %}The cheapest machine online right now is <span class="o-mono">{{ cheapest | dollars }}</span> an hour.{% else %}No machines are online right now.{% endif %}</p>
+    </div>
   </div>
-  <p class="text-secondary small">Paid through Stripe. Hardware time does not expire and is not refundable.</p>
-  {% else %}
-  <div class="alert alert-warning">Card payments are not set up yet.</div>
+
+  {% if not stripe_ready %}
+  <div class="o-alert o-alert--warn" role="status"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i><div>Card payments are not set up yet. The amounts below cannot be bought until they are.</div></div>
   {% endif %}
+
+  <form method="post" action="/store/checkout" class="o-panel">
+    <fieldset class="o-panel__body" style="border:0;margin:0;min-width:0" {{ 'disabled' if not stripe_ready }}>
+      <legend class="o-h2 mb-3" style="float:left;width:100%;padding:0">Amount</legend>
+      <div class="o-stack mb-3">
+        {% for a in amounts %}
+        <label class="o-option">
+          <input type="radio" name="amount_cents" value="{{ a }}" {{ 'checked' if loop.first }}>
+          <span>
+            <span class="o-option__title">{{ a | dollars }}</span>
+            <span class="o-small o-muted d-block">{% if cheapest %}about {{ (a * 60 // cheapest) }} minutes on the cheapest machine online now{% else %}no machine is online to measure against{% endif %}</span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      <button class="o-btn o-btn--primary o-btn--block o-btn--lg" type="submit" data-loading="Going to Stripe…"><i class="bi bi-credit-card" aria-hidden="true"></i>Pay by card</button>
+      <p class="o-small o-muted mt-3 mb-0">Paid through Stripe. Hardware time does not expire and is not refundable.</p>
+    </fieldset>
+  </form>
 
   {% if dev %}
-  <div class="card border-warning mt-4"><div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
-    <div><div class="fw-semibold">Test funds</div><div class="text-secondary small">Only here because development mode is on.</div></div>
-    <form method="post" action="/store/dev-funds"><input type="hidden" name="amount_cents" value="1000"><button class="btn btn-outline-warning">Add $10.00 of test funds</button></form>
+  <div class="o-panel o-panel--warn mt-4"><div class="o-panel__body" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:var(--o-s-2)">
+    <div><div class="o-h3">Test funds</div><div class="o-small o-muted">Only here because development mode is on.</div></div>
+    <form method="post" action="/store/dev-funds" style="margin:0"><input type="hidden" name="amount_cents" value="1000"><button class="o-btn o-btn--warn" type="submit" data-loading="Adding…">Add $10.00 of test funds</button></form>
   </div></div>
   {% endif %}
-</div></div>
+</div>
 {% endblock %}

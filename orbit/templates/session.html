@@ -1,47 +1,52 @@
 {% extends "base.html" %}
 {% block title %}Session · Orbit{% endblock %}
+{% block page_title %}Session on {{ s.host_name }}{% endblock %}
 {% block body %}
-{% if flash %}<div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-exclamation-circle"></i><div>{{ flash }}</div></div>{% endif %}
-<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+{% if flash %}<div class="o-alert o-alert--warn" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i><div>{{ flash }}</div></div>{% endif %}
+<div class="o-page-head">
   <div>
-    <div class="kicker">Session</div>
-    <h1 class="h3 mb-1">{{ s.model }}</h1>
-    <div class="text-secondary">On <strong class="text-body">{{ s.host_name }}</strong> · {{ s.gpu }} · {{ s.vram_gb }} GB · {{ s.price_cents_per_hour | dollars }} an hour</div>
+    <div class="o-small o-muted">Session</div>
+    <h1 class="o-h2 o-mono o-break">{{ s.model }}</h1>
+    <p class="o-sub">On <strong>{{ s.host_name }}</strong>: {{ s.gpu }}, <span class="o-mono">{{ s.vram_gb }} GB</span>, <span class="o-mono">{{ s.price_cents_per_hour | dollars }}</span> an hour</p>
   </div>
-  {% if s.ended_at %}<span class="badge text-bg-secondary fs-6">ended</span>{% elif not s.ready_at %}<span class="badge text-bg-secondary fs-6">starting</span>{% else %}<span class="badge text-bg-success fs-6">running</span>{% endif %}
+  {% if s.ended_at %}<span class="o-badge o-badge--lg"><i class="bi bi-stop-circle" aria-hidden="true"></i>ended</span>
+  {% elif not s.ready_at %}<span class="o-badge o-badge--lg o-badge--info"><span class="o-spin" aria-hidden="true"></span>starting</span>
+  {% else %}<span class="o-badge o-badge--lg o-badge--ok"><span class="o-dot" aria-hidden="true"></span>running</span>{% endif %}
 </div>
 
 {% if s.ended_at %}
-<div class="card mb-3"><div class="card-body">
-  <div class="row g-3">
-    <div class="col-sm-4"><div class="text-secondary small">Minutes used</div><div class="stat-n">{{ s.minutes }}</div></div>
-    <div class="col-sm-4"><div class="text-secondary small">You paid</div><div class="stat-n">{{ s.cost_cents | dollars }}</div></div>
-    <div class="col-sm-4"><div class="text-secondary small">Left</div><div class="stat-n">{{ balance | dollars }}</div></div>
-  </div>
+<div class="o-panel"><div class="o-panel__body">
+  <dl class="o-stats mb-0">
+    <div><dt class="o-stat__label">Minutes used</dt><dd class="o-stat__value mb-0">{{ s.minutes }}</dd></div>
+    <div><dt class="o-stat__label">You paid</dt><dd class="o-stat__value mb-0">{{ s.cost_cents | dollars }}</dd></div>
+    <div><dt class="o-stat__label">Left</dt><dd class="o-stat__value mb-0">{{ balance | dollars }}</dd></div>
+  </dl>
   {% if s.end_reason == 'out_of_time' %}
-  <div class="text-secondary mt-3">Your hardware time ran out, so the session ended on its own. You were charged for the minutes you had.</div>
+  <p class="o-muted mt-3 mb-0">Your hardware time ran out, so the session ended on its own. You were charged for the minutes you had.</p>
   {% elif s.end_reason == 'host_lost' %}
-  <div class="text-secondary mt-3">The machine stopped answering, so the session ended. You were charged only up to the last minute it was reachable.</div>
+  <p class="o-muted mt-3 mb-0">The machine stopped answering, so the session ended. You were charged only up to the last minute it was reachable.</p>
   {% elif s.end_reason == 'stopped' %}
-  <div class="text-secondary mt-3">You stopped it. The conversation ended with the session; Orbit does not keep it.</div>
+  <p class="o-muted mt-3 mb-0">You stopped it. The conversation ended with the session; Orbit does not keep it.</p>
   {% endif %}
 </div></div>
-<div class="d-flex gap-2"><a class="btn btn-primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="btn btn-outline-light" href="/account">Account</a></div>
+<div class="o-actions mt-3"><a class="o-btn o-btn--primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="o-btn" href="/account">Account</a></div>
+
 {% elif not s.ready_at %}
-<div class="card mb-3"><div class="card-body d-flex align-items-center gap-3">
-  <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
-  <div><strong>Waiting for the machine. You are not being charged.</strong>
-    <div class="text-secondary small">The clock starts when the model is loaded and ready.</div></div>
+<div class="o-panel"><div class="o-panel__body" style="display:flex;align-items:center;gap:var(--o-s-2)">
+  <span class="o-spin o-spin--lg o-muted" aria-hidden="true"></span>
+  <div role="status"><strong>Waiting for the machine. You are not being charged.</strong>
+    <div class="o-small o-muted">The clock starts when the model is loaded and ready. This page checks again every five seconds.</div></div>
 </div></div>
 <script>setTimeout(function () { location.reload(); }, 5000);</script>
-<form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
+<form method="post" action="/sessions/{{ s.id }}/stop" class="mt-3"><button class="o-btn o-btn--danger" type="submit" data-loading="Stopping…"><i class="bi bi-stop-circle" aria-hidden="true"></i>Stop session</button></form>
+
 {% else %}
-<div class="card mb-3"><div class="card-body">
-  <div class="row g-3">
-    <div class="col-sm-4"><div class="text-secondary small">Running for</div><div class="stat-n" id="elapsed">0:00</div></div>
-    <div class="col-sm-4"><div class="text-secondary small">Cost so far</div><div class="stat-n" id="cost">$0.00</div></div>
-    <div class="col-sm-4"><div class="text-secondary small">Time left</div><div class="stat-n" id="left">{{ minutes_left }} min</div></div>
-  </div>
+<div class="o-panel"><div class="o-panel__body">
+  <dl class="o-stats mb-0">
+    <div><dt class="o-stat__label">Running for</dt><dd class="o-stat__value mb-0" id="elapsed">0:00</dd></div>
+    <div><dt class="o-stat__label">Cost so far</dt><dd class="o-stat__value mb-0" id="cost">$0.00</dd></div>
+    <div><dt class="o-stat__label">Time left</dt><dd class="o-stat__value mb-0" id="left">{{ minutes_left }} min</dd></div>
+  </dl>
 </div></div>
 <script>
 (function () {
@@ -59,15 +64,20 @@
   tick(); setInterval(tick, 1000);
 })();
 </script>
-<div class="card mb-3"><div class="card-body">
-  <div id="chat" class="chat-log mb-3" aria-live="polite"></div>
-  <form id="say" class="d-flex gap-2" autocomplete="off">
-    <input id="msg" class="form-control" placeholder="Say something to the model" autofocus maxlength="64000">
-    <button class="btn btn-primary">Send</button>
+<div class="o-panel"><div class="o-panel__body">
+  <div id="chat" class="o-chat" role="log" aria-label="Conversation">
+    <p class="o-chat__empty">Nothing has been said yet. Messages show here while the session runs; Orbit deletes them when it ends.</p>
+  </div>
+  <form id="say" class="o-compose" autocomplete="off">
+    <label class="visually-hidden" for="msg">Message to the model</label>
+    <input id="msg" class="o-input" placeholder="Say something to the model" autofocus maxlength="64000">
+    <button class="o-btn o-btn--primary" type="submit"><i class="bi bi-send" aria-hidden="true"></i>Send</button>
   </form>
-  <div class="d-flex align-items-start gap-2 mt-2 small">
-    <span id="seal-state" class="badge text-bg-secondary">Waiting for the host's key</span>
-    <span id="seal-note" class="text-secondary">Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it.</span>
+  <div class="o-seal">
+    <span id="seal-state" class="o-badge" aria-live="polite"><i class="bi bi-hourglass-split" id="seal-icon" aria-hidden="true"></i><span id="seal-text">Waiting for the host's key</span></span>
+    <p id="seal-note" class="o-seal__note">Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it.</p>
+    <button id="seal-allow" class="o-btn o-btn--warn o-btn--sm o-seal__allow" type="button" hidden>Send unsealed anyway</button>
+    <span id="seal-allowed" class="o-small o-warn" hidden>Sending unsealed by your choice until this page is reloaded.</span>
   </div>
 </div></div>
 <script src="/static/seal.js"></script>
@@ -75,26 +85,48 @@
 (function () {
   var sid = {{ s.id }}, after = 0, seen = {}, thinking = null;
   var log = document.getElementById('chat'), form = document.getElementById('say'), input = document.getElementById('msg');
-  var badge = document.getElementById('seal-state'), note = document.getElementById('seal-note');
+  var badge = document.getElementById('seal-state'), icon = document.getElementById('seal-icon'), label = document.getElementById('seal-text'), note = document.getElementById('seal-note');
+  var allowBtn = document.getElementById('seal-allow'), allowedNote = document.getElementById('seal-allowed');
   var STORE = 'orbit-seal-' + sid, WAIT_FOR_KEY_MS = 10000, loadedAt = Date.now();
   var sealer = null, state = 'waiting', lastHostHello = null, needHello = false, foreign = false;
+  // Once per page load the user may choose to send readable messages when there is no seal.
+  // Until they do, nothing is sent unsealed. Reloading the page withdraws the choice.
+  var allowPlain = false;
   // Every sentence here must stay exactly true (rule 5). See docs/PRIVACY.md.
   var copy = {
-    waiting: ['text-bg-secondary', "Waiting for the host's key",
-      "Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it."],
-    sealed: ['text-bg-success', 'Sealed from Orbit',
-      "Orbit relays envelopes it cannot open and deletes them when the session ends. The host's machine runs the model and can read this conversation; nothing checks that machine yet."],
-    unsealed: ['text-bg-warning', 'Unsealed',
-      "This host's program offered no key, so messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too."],
-    insecure: ['text-bg-warning', 'Unsealed',
-      "This page was not opened over https, so the browser cannot seal. Messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too."]
+    waiting: ['', "Waiting for the host's key",
+      "Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it.", 'bi-hourglass-split'],
+    sealed: ['o-badge--ok', 'Sealed from Orbit',
+      "Orbit relays envelopes it cannot open and deletes them when the session ends. The host's machine runs the model and can read this conversation; nothing checks that machine yet.", 'bi-lock-fill'],
+    unsealed: ['o-badge--warn', 'Unsealed',
+      "This host's program offered no key, so messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too.", 'bi-unlock'],
+    insecure: ['o-badge--warn', 'Unsealed',
+      "This page was not opened over https, so the browser cannot seal. Messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too.", 'bi-unlock']
   };
-  function setState(s) { state = s; badge.className = 'badge ' + copy[s][0]; badge.textContent = copy[s][1]; note.textContent = copy[s][2]; }
+  function plainState() { return state === 'unsealed' || state === 'insecure'; }
+  function setState(s) {
+    state = s;
+    badge.className = 'o-badge ' + copy[s][0]; icon.className = 'bi ' + copy[s][3];
+    label.textContent = copy[s][1]; note.textContent = copy[s][2];
+    allowBtn.hidden = !plainState() || allowPlain;
+    allowedNote.hidden = !plainState() || !allowPlain;
+  }
+  allowBtn.addEventListener('click', function () {
+    allowPlain = true; setState(state);
+    add('system', 'You chose to send unsealed. Messages from now on pass through Orbit readable, until you reload this page.', 'o-msg--warn');
+    input.focus();
+  });
   function add(sender, text, extra) {
     var d = document.createElement('div');
-    d.className = 'msg msg-' + sender + (extra ? ' ' + extra : '');
+    d.className = 'o-msg o-msg--' + sender + (extra ? ' ' + extra : '');
     d.textContent = text;
     log.appendChild(d); log.scrollTop = log.scrollHeight;
+    return d;
+  }
+  function waitingForAnswer() {
+    var d = add('host', '', 'o-msg--thinking');
+    var s = document.createElement('span'); s.className = 'o-spin'; s.setAttribute('aria-hidden', 'true');
+    d.appendChild(s); d.appendChild(document.createTextNode('Waiting for the answer'));
     return d;
   }
   function keep(s) { s.export().then(function (k) { try { sessionStorage.setItem(STORE, JSON.stringify(k)); } catch (e) {} }).catch(function () {}); }
@@ -121,16 +153,16 @@
       if (env.from === 'host') {
         lastHostHello = env;
         try { await (await sealerFor()).accept(env); needHello = true; foreign = false; setState('sealed'); }
-        catch (e) { add('system', 'The host offered a key this browser could not use: ' + e.message, 'text-warning'); }
+        catch (e) { add('system', 'The host offered a key this browser could not use: ' + e.message, 'o-msg--warn'); }
       } else if (sealer && env.pk === sealer.publicB64) { needHello = false; foreign = false; }
       else { foreign = true; }  // another tab answered the host, so its key is current and ours is not
       return;
     }
     if (m.sender === 'host' && thinking) { thinking.remove(); thinking = null; }
     if (env && env.t === 'msg') {
-      if (!sealer || !sealer.ready() || foreign) { add('system', 'A sealed message this tab cannot open.', 'text-secondary'); return; }
+      if (!sealer || !sealer.ready() || foreign) { add('system', 'A sealed message this tab cannot open.', 'o-msg--faint'); return; }
       try { add(m.sender, await sealer.unseal(env)); }
-      catch (e) { add('system', 'A sealed message this tab cannot open (' + e.message + ').', 'text-secondary'); }
+      catch (e) { add('system', 'A sealed message this tab cannot open (' + e.message + ').', 'o-msg--faint'); }
       return;
     }
     add(m.sender, m.body);
@@ -151,34 +183,38 @@
     e.preventDefault();
     var text = input.value.trim();
     if (!text) return;
-    if (state === 'waiting') { add('system', "Waiting for the host's key. Try again in a moment.", 'text-secondary'); return; }
+    if (state === 'waiting') { add('system', "Waiting for the host's key. Try again in a moment.", 'o-msg--faint'); return; }
+    if (plainState() && !allowPlain) {
+      add('system', 'Not sent: this session is not sealed from Orbit, so the message would pass through Orbit readable. Choose "Send unsealed anyway" to send it that way.', 'o-msg--warn');
+      return;
+    }
     input.value = '';
     var body = text;
     if (state === 'sealed') {
       try {
         if (foreign) { sealer = await OrbitSeal.create(sid, 'user'); keep(sealer); await sealer.accept(lastHostHello); foreign = false; await sendHello(); }
         body = await sealer.seal(text);
-      } catch (err) { add('system', 'Not sent: could not seal (' + err.message + ').', 'text-warning'); return; }
+      } catch (err) { add('system', 'Not sent: could not seal (' + err.message + ').', 'o-msg--warn'); return; }
     }
     try {
       var r = await post(body);
       if (!r.ok) {
         if (state === 'sealed') sealer.sent -= 1;  // the host never saw this number
-        var j = await r.json(); add('system', 'Not sent: ' + (j.detail || r.status), 'text-warning'); return;
+        var j = await r.json(); add('system', 'Not sent: ' + (j.detail || r.status), 'o-msg--warn'); return;
       }
       var ok = await r.json();
       seen[ok.id] = true;
       add('user', text);
-      if (!thinking) thinking = add('host', 'Thinking…', 'text-secondary');
+      if (!thinking) thinking = waitingForAnswer();
     } catch (err) {
       if (state === 'sealed') sealer.sent -= 1;
-      add('system', 'Not sent: Orbit did not answer.', 'text-warning');
+      add('system', 'Not sent: Orbit did not answer.', 'o-msg--warn');
     }
   });
   setState(OrbitSeal.available ? 'waiting' : 'insecure');
   poll();
 })();
 </script>
-<form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
+<form method="post" action="/sessions/{{ s.id }}/stop" class="mt-3"><button class="o-btn o-btn--danger" type="submit" data-loading="Stopping…"><i class="bi bi-stop-circle" aria-hidden="true"></i>Stop session</button></form>
 {% endif %}
 {% endblock %}

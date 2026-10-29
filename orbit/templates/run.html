@@ -1,87 +1,107 @@
 {% extends "base.html" %}
-{% block title %}Orbit{% endblock %}
+{% block title %}Run a model · Orbit{% endblock %}
+{% block page_title %}Run a model{% endblock %}
 {% block body %}
-{% if flash %}<div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-exclamation-circle"></i><div>{{ flash }}</div></div>{% endif %}
+{% if flash %}<div class="o-alert o-alert--warn" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i><div>{{ flash }}</div></div>{% endif %}
 
 {% if active and not model %}
-<div class="alert alert-success d-flex justify-content-between align-items-center">
-  <span><i class="bi bi-circle-fill me-2" style="font-size:.5rem"></i>Your session on <strong>{{ active.host_name }}</strong> is running.</span>
-  <a class="btn btn-sm btn-success" href="/sessions/{{ active.id }}">Open it</a>
+<div class="o-alert o-alert--ok" role="status">
+  <i class="bi bi-play-circle-fill" aria-hidden="true"></i>
+  <div>Your session on <strong>{{ active.host_name }}</strong> is running.</div>
+  <div class="o-alert__actions"><a class="o-btn o-btn--sm" href="/sessions/{{ active.id }}">Open it</a></div>
 </div>
 {% endif %}
 
-<form method="get" action="/" class="input-group input-group-lg mb-2">
-  <span class="input-group-text"><i class="bi bi-search"></i></span>
-  <input class="form-control" type="text" name="model" value="{{ model }}" placeholder="Model name or Hugging Face link" autofocus required autocomplete="off" spellcheck="false">
-  <button class="btn btn-primary">Find a machine</button>
+<div class="o-page-head">
+  <div>
+    <h1 class="o-h1">Run a model</h1>
+    <p class="o-sub">Name an open model. Orbit shows which machines can hold it and what each costs an hour.</p>
+  </div>
+  <span class="o-badge {{ 'o-badge--ok' if hosts_online else '' }}"><span class="o-dot" aria-hidden="true"></span>{{ hosts_online }} machine{{ 's' if hosts_online != 1 }} online</span>
+</div>
+
+<form method="get" action="/" class="o-search" role="search">
+  <label class="visually-hidden" for="model">Model name or Hugging Face link</label>
+  <input id="model" class="o-input o-input--lg o-input--mono" type="text" name="model" value="{{ model }}" placeholder="owner/model, or a Hugging Face link" autofocus required autocomplete="off" spellcheck="false">
+  <button class="o-btn o-btn--lg {{ '' if model else 'o-btn--primary' }}" type="submit" data-loading="Finding…"><i class="bi bi-search" aria-hidden="true"></i>Find a machine</button>
 </form>
-<div class="d-flex flex-wrap align-items-center gap-2 mb-4 small text-secondary">
+<div class="o-actions o-small o-muted mt-2 mb-4" style="align-items:center">
   {% if recent %}
     <span>Recent:</span>
-    {% for r in recent %}<a class="badge rounded-pill text-bg-dark border text-decoration-none" href="/?model={{ r | urlencode }}">{{ r }}</a>{% endfor %}
+    {% for r in recent %}<a class="o-chip" href="/?model={{ r | urlencode }}">{{ r }}</a>{% endfor %}
   {% else %}
     <span>Try:</span>
-    <a class="badge rounded-pill text-bg-dark border text-decoration-none" href="/?model=bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M">Qwen2.5 7B</a>
-    <a class="badge rounded-pill text-bg-dark border text-decoration-none" href="/?model=bartowski/Meta-Llama-3.1-8B-Instruct-GGUF Q4_K_M">Llama 3.1 8B</a>
-    <a class="badge rounded-pill text-bg-dark border text-decoration-none" href="/?model=bartowski/gemma-2-9b-it-GGUF Q4_K_M">Gemma 2 9B</a>
+    <a class="o-chip" href="/?model=bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M">Qwen2.5 7B</a>
+    <a class="o-chip" href="/?model=bartowski/Meta-Llama-3.1-8B-Instruct-GGUF Q4_K_M">Llama 3.1 8B</a>
+    <a class="o-chip" href="/?model=bartowski/gemma-2-9b-it-GGUF Q4_K_M">Gemma 2 9B</a>
   {% endif %}
-  <span class="ms-auto"><i class="bi bi-circle-fill text-success me-1" style="font-size:.5rem"></i>{{ hosts_online }} machine{{ 's' if hosts_online != 1 }} online</span>
 </div>
 
 {% if model %}
   {% if need_quant %}
-  <div class="alert alert-secondary d-flex flex-wrap align-items-center gap-2">
-    <span>Orbit can see the size but not the quantization. Pick one to check fit:</span>
-    {% for q in ["Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0"] %}<a class="btn btn-sm btn-outline-light" href="/?model={{ (model ~ ' ' ~ q) | urlencode }}">{{ q }}</a>{% endfor %}
-    <span class="text-secondary small">Q4 is the usual choice: smallest and fast. Q8 is closest to the original.</span>
+  <div class="o-alert o-alert--info">
+    <i class="bi bi-info-circle" aria-hidden="true"></i>
+    <div>
+      <div class="mb-2">Orbit can see the size but not the quantization. Pick one to check fit:</div>
+      <div class="o-actions mb-2">{% for q in ["Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0"] %}<a class="o-chip" href="/?model={{ (model ~ ' ' ~ q) | urlencode }}">{{ q }}</a>{% endfor %}</div>
+      <div class="o-small o-muted">Q4 is the usual choice: smallest and fast. Q8 is closest to the original.</div>
+    </div>
   </div>
   {% endif %}
   {% if results %}
-  <div class="d-grid gap-3">
-    {% for h, f in results %}
-    <div class="card {{ 'opacity-50' if f.verdict == 'too_big' or h.status != 'online' }}"><div class="card-body row g-3 align-items-center">
-      <div class="col-md-4"><div class="fw-bold">{{ h.name }} {% if h.status == 'busy' %}<span class="badge text-bg-warning ms-1">in use</span>{% endif %}</div><div class="text-secondary small">{{ h.gpu }} · {{ h.vram_gb }} GB</div></div>
-      <div class="col-md-2"><div class="price-n">{{ h.price_cents_per_hour | dollars }}</div><div class="text-secondary small">per hour</div></div>
-      <div class="col-md-4">
-        <span class="badge {{ 'text-bg-success' if f.verdict == 'fits' else 'text-bg-warning' if f.verdict == 'tight' else 'text-bg-danger' if f.verdict == 'too_big' else 'text-bg-secondary' }} mb-1">{{ f.verdict.replace('_', ' ') }}</span>
-        <div class="text-secondary small">{{ f.reason }}</div>
-      </div>
-      <div class="col-md-2 text-md-end">
-        {% if h.status == 'busy' %}
-          {% if active %}<a class="btn btn-outline-light btn-sm" href="/sessions/{{ active.id }}">Open session</a>{% else %}<span class="text-secondary small">someone is using it</span>{% endif %}
-        {% elif f.verdict != 'too_big' %}
-          {% if user %}
-            {% if active %}<a class="btn btn-outline-light btn-sm" href="/sessions/{{ active.id }}">Open session</a>
-            {% elif balance >= h.price_cents_per_hour %}
-            <form method="post" action="/sessions/start"><input type="hidden" name="model" value="{{ model }}"><input type="hidden" name="host_id" value="{{ h.id }}"><button class="btn btn-primary">Start</button></form>
-            {% else %}<a class="btn btn-outline-light" href="/store" title="You need at least one hour on this machine">Add time</a>{% endif %}
-          {% else %}<a class="btn btn-outline-light" href="/signup">Sign up to start</a>{% endif %}
-        {% endif %}
-      </div>
-    </div></div>
-    {% endfor %}
+  <div class="o-panel">
+    <div class="o-panel__head"><h2 class="o-h2 o-break">Machines for <span class="o-mono">{{ model }}</span></h2></div>
+    <div class="o-table-wrap">
+    <table class="o-table o-table--stack">
+      <caption class="visually-hidden">Machines online now, cheapest first, with whether this model fits</caption>
+      <thead><tr><th scope="col">Machine</th><th scope="col">GPU</th><th scope="col" class="num">Memory</th><th scope="col" class="num">Price / hour</th><th scope="col">Fit</th><th scope="col" class="act"><span class="visually-hidden">Action</span></th></tr></thead>
+      <tbody>
+      {% for h, f in results %}
+      <tr class="{{ 'is-dim' if f.verdict == 'too_big' or h.status != 'online' }}">
+        <td data-label="Machine"><span class="o-table__name">{{ h.name }}</span>{% if h.status == 'busy' %} <span class="o-badge o-badge--warn"><i class="bi bi-person-fill" aria-hidden="true"></i>in use</span>{% endif %}</td>
+        <td data-label="GPU">{{ h.gpu }}</td>
+        <td data-label="Memory" class="num">{{ h.vram_gb }} GB</td>
+        <td data-label="Price / hour" class="num">{{ h.price_cents_per_hour | dollars }}</td>
+        <td data-label="Fit">
+          {% if f.verdict == 'fits' %}<span class="o-badge o-badge--ok"><i class="bi bi-check-lg" aria-hidden="true"></i>fits</span>
+          {% elif f.verdict == 'tight' %}<span class="o-badge o-badge--warn"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>tight</span>
+          {% elif f.verdict == 'too_big' %}<span class="o-badge o-badge--danger"><i class="bi bi-x-lg" aria-hidden="true"></i>too big</span>
+          {% else %}<span class="o-badge"><i class="bi bi-question-lg" aria-hidden="true"></i>unknown</span>{% endif %}
+          <div class="o-small o-muted mt-1">{{ f.reason }}</div>
+        </td>
+        <td class="act">
+          {% if h.status == 'busy' %}
+            {% if active %}<a class="o-btn o-btn--sm" href="/sessions/{{ active.id }}">Open session</a>{% else %}<span class="o-small o-faint">someone is using it</span>{% endif %}
+          {% elif f.verdict != 'too_big' %}
+            {% if user %}
+              {% if active %}<a class="o-btn o-btn--sm" href="/sessions/{{ active.id }}">Open session</a>
+              {% elif balance >= h.price_cents_per_hour %}
+              <form method="post" action="/sessions/start"><input type="hidden" name="model" value="{{ model }}"><input type="hidden" name="host_id" value="{{ h.id }}"><button class="o-btn o-btn--primary o-btn--sm" type="submit" data-loading="Starting…">Start</button></form>
+              {% else %}<a class="o-btn o-btn--sm" href="/store" title="You need at least one hour on this machine">Add time</a>{% endif %}
+            {% else %}<a class="o-btn o-btn--sm" href="/signup">Sign up to start</a>{% endif %}
+          {% else %}<span class="visually-hidden">Does not fit</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
   </div>
   {% else %}
-  <div class="card"><div class="card-body">
-    <div class="fw-semibold mb-1">No machines are online right now.</div>
-    <div class="text-secondary">Hosts come and go. Check back in a bit, or <a href="/hosts">list your own GPU</a> and be the first.</div>
+  <div class="o-panel"><div class="o-empty">
+    <i class="bi bi-pc-display" aria-hidden="true"></i>
+    <strong>No machines are online right now.</strong>
+    <div class="mt-1">Hosts come and go. Check back in a bit, or <a href="/hosts">list your own GPU</a> and be the first.</div>
   </div></div>
   {% endif %}
 {% else %}
-  <div class="row g-3 mt-2">
-    <div class="col-md-4"><div class="card h-100"><div class="card-body">
-      <div class="step-num mb-2">1</div><div class="fw-semibold">Name a model</div>
-      <div class="text-secondary small">Any open model on Hugging Face. Paste the link or the name. Orbit reads the size and says which machines fit, or says "unknown" if it can't tell.</div>
-    </div></div></div>
-    <div class="col-md-4"><div class="card h-100"><div class="card-body">
-      <div class="step-num mb-2">2</div><div class="fw-semibold">Pick a machine</div>
-      <div class="text-secondary small">One price per hour, set by the host. The whole GPU is yours alone until you stop. You pay only for the hardware, not per token.</div>
-    </div></div></div>
-    <div class="col-md-4"><div class="card h-100"><div class="card-body">
-      <div class="step-num mb-2">3</div><div class="fw-semibold">Start</div>
-      <div class="text-secondary small">The model loads and you talk to it in your browser. Orbit holds a list and a ledger; your conversation never passes through it.</div>
-    </div></div></div>
-  </div>
-  <div class="text-secondary small mt-4">Have an idle GPU? <a href="/hosts">List it</a> and get paid for every hour it is used.</div>
+  <div class="o-panel"><div class="o-panel__body">
+    <ol class="o-steps">
+      <li class="o-step"><div class="o-h3">Name a model</div><p class="o-small o-muted mb-0 mt-1">Any open model on Hugging Face. Paste the link or the name. Orbit reads the size and says which machines fit, or says "unknown" if it can't tell.</p></li>
+      <li class="o-step"><div class="o-h3">Pick a machine</div><p class="o-small o-muted mb-0 mt-1">One price per hour, set by the host. The whole GPU is yours alone until you stop. You pay only for the hardware, not per token.</p></li>
+      <li class="o-step"><div class="o-h3">Start</div><p class="o-small o-muted mb-0 mt-1">The model loads and you talk to it in your browser. Orbit holds a list and a ledger; your conversation never passes through it unsealed once the host has offered its key, and the session page says which it is.</p></li>
+    </ol>
+  </div></div>
+  <p class="o-small o-muted mt-3 mb-0">Have an idle GPU? <a href="/hosts">List it</a> and get paid for every hour it is used.</p>
 {% endif %}
 {% endblock %}

@@ -3,62 +3,99 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0b0f">
 <title>{% block title %}Orbit{% endblock %}</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
 <link rel="stylesheet" href="/static/vendor/bootstrap-icons.min.css">
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body class="d-flex flex-column min-vh-100">
-<nav class="navbar navbar-expand-md sticky-top">
-  <div class="container">
-    <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/">
-      <svg class="text-primary" width="24" height="24" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" aria-hidden="true">
-        <path d="M 82.68 40.63 A 34 34 0 1 1 64.91 19.44"/><circle cx="76.04" cy="28.15" r="6"/>
-      </svg> Orbit
-    </a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav" aria-expanded="false" aria-label="Menu">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="nav">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="/">Run a model</a></li>
-        <li class="nav-item"><a class="nav-link" href="/hosts">Hosts</a></li>
-      </ul>
-      <ul class="navbar-nav align-items-md-center gap-2">
-        {% if user %}
-          {% if nav_active %}<li class="nav-item"><a class="btn btn-success btn-sm" href="/sessions/{{ nav_active.id }}"><i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Session on {{ nav_active.host_name }}</a></li>{% endif %}
-          <li class="nav-item"><a class="nav-link" href="/store" title="Add time"><strong class="text-body">{{ nav_balance | dollars }}</strong> <i class="bi bi-plus-circle ms-1"></i></a></li>
-          <li class="nav-item"><a class="nav-link" href="/account"><i class="bi bi-person-circle me-1"></i>Account</a></li>
-          <li class="nav-item"><form method="post" action="/logout"><button class="btn btn-outline-light btn-sm">Sign out</button></form></li>
-        {% else %}
-          <li class="nav-item"><a class="nav-link" href="/login">Sign in</a></li>
-          <li class="nav-item"><a class="btn btn-primary" href="/signup">Get started</a></li>
-        {% endif %}
-      </ul>
-    </div>
-  </div>
+<body>
+{# The mark is inlined so it takes the colour around it. Same geometry as /static/logo.svg. #}
+{% macro mark(size) -%}
+<svg class="o-mark" width="{{ size }}" height="{{ size }}" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="4.5" stroke-linecap="round"><path d="M41.64 12.23A22 22 0 1 0 53.95 33.53"/></g><circle cx="51.05" cy="21.00" r="4.5" fill="currentColor"/></svg>
+{%- endmacro %}
+{% set here = request.url.path %}
+<a class="o-skip" href="#main">Skip to content</a>
+
+<nav class="o-rail" aria-label="Main">
+  <a class="o-rail__brand" href="/" title="Orbit">{{ mark(26) }}<span class="visually-hidden">Orbit home</span></a>
+  <ul class="o-rail__list">
+    <li><a class="o-rail__item" href="/" title="Run a model"{% if here in ('/', '/run') %} aria-current="page"{% endif %}><i class="bi bi-play-circle" aria-hidden="true"></i><span class="o-rail__label">Run</span></a></li>
+    <li><a class="o-rail__item" href="/hosts" title="Machines"{% if here == '/hosts' %} aria-current="page"{% endif %}><i class="bi bi-pc-display" aria-hidden="true"></i><span class="o-rail__label">Machines</span></a></li>
+    {% if user %}
+    <li><a class="o-rail__item" href="/store" title="Add time"{% if here == '/store' %} aria-current="page"{% endif %}><i class="bi bi-plus-circle" aria-hidden="true"></i><span class="o-rail__label">Add time</span></a></li>
+    {% endif %}
+  </ul>
+  <ul class="o-rail__list o-rail__list--end">
+    {% if user %}
+    <li><a class="o-rail__item" href="/account" title="Account"{% if here == '/account' %} aria-current="page"{% endif %}><i class="bi bi-person-circle" aria-hidden="true"></i><span class="o-rail__label">Account</span></a></li>
+    {% else %}
+    <li><a class="o-rail__item" href="/login" title="Sign in"{% if here == '/login' %} aria-current="page"{% endif %}><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i><span class="o-rail__label">Sign in</span></a></li>
+    {% endif %}
+  </ul>
 </nav>
 
-<main class="flex-grow-1">
-  <div class="container py-4">
-  {% block body %}{% endblock %}
-  </div>
-</main>
+<div class="o-main">
+  <header class="o-top">
+    <a class="o-top__brand" href="/">{{ mark(24) }}Orbit</a>
+    <div class="o-top__title">{% block page_title %}Orbit{% endblock %}</div>
+    <div class="o-top__right">
+      {% if user %}
+        {% if nav_active %}<a class="o-pill" href="/sessions/{{ nav_active.id }}"><span class="o-dot" aria-hidden="true"></span>Session<span class="o-top__hide-sm"> on {{ nav_active.host_name }}</span></a>{% endif %}
+        <a class="o-balance" href="/store" title="Add time"><span class="visually-hidden">Hardware time: </span><span class="o-mono">{{ nav_balance | dollars }}</span><i class="bi bi-plus-circle" aria-hidden="true"></i><span class="visually-hidden">. Add time</span></a>
+        <form method="post" action="/logout"><button class="o-btn o-btn--ghost o-btn--sm" type="submit" title="Sign out"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span class="o-top__hide-sm">Sign out</span></button></form>
+      {% else %}
+        <a class="o-btn o-btn--ghost o-btn--sm" href="/login">Sign in</a>
+        <a class="o-btn o-btn--sm" href="/signup">Get started</a>
+      {% endif %}
+    </div>
+  </header>
 
-<footer class="py-4 mt-5">
-  <div class="container d-flex flex-column flex-md-row justify-content-between gap-3 text-secondary small">
-    <div>
-      <div class="fw-semibold text-body">Orbit</div>
-      Orbit holds a list of machines and a ledger. Models run on hosts' machines, not here.
-      {% if dev %}<div class="text-warning mt-2">Development mode is on. Test funds are enabled.</div>{% endif %}
+  <main id="main" class="o-content" tabindex="-1">
+  {% block body %}{% endblock %}
+  </main>
+
+  <footer class="o-footer">
+    <div class="o-footer__in">
+      <div>
+        <div class="o-h3 o-muted">Orbit</div>
+        <div>Orbit holds a list of machines and a ledger. Models run on hosts' machines, not here.</div>
+        {% if dev %}<div class="o-footer__dev"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>Development mode is on. Test funds are enabled.</div>{% endif %}
+      </div>
+      <div class="o-footer__cols">
+        <div><span class="o-h3 o-muted">Use</span><a href="/run">Run a model</a><a href="/store">Add time</a></div>
+        <div><span class="o-h3 o-muted">Host</span><a href="/hosts">List a machine</a></div>
+      </div>
     </div>
-    <div class="d-flex gap-4">
-      <div><div class="fw-semibold text-body mb-1">Use</div><a class="d-block link-secondary" href="/run">Run a model</a><a class="d-block link-secondary" href="/store">Add time</a></div>
-      <div><div class="fw-semibold text-body mb-1">Host</div><a class="d-block link-secondary" href="/hosts">List a machine</a></div>
-    </div>
-  </div>
-</footer>
-<script src="/static/vendor/bootstrap.bundle.min.js"></script>
+  </footer>
+</div>
+
+<script>
+// A submit button marked data-loading shows that the request is in flight. Honest: it only
+// changes once the browser has actually started submitting, and it goes back if the page is
+// restored from the back-forward cache.
+(function () {
+  document.addEventListener('submit', function (e) {
+    if (e.defaultPrevented) return;
+    var b = e.target.querySelector('button[data-loading]');
+    if (!b) return;
+    b.setAttribute('data-label', b.innerHTML);
+    b.setAttribute('aria-busy', 'true');
+    b.textContent = '';
+    var s = document.createElement('span'); s.className = 'o-spin'; s.setAttribute('aria-hidden', 'true');
+    b.appendChild(s); b.appendChild(document.createTextNode(b.getAttribute('data-loading')));
+    setTimeout(function () { b.disabled = true; }, 0);
+  });
+  window.addEventListener('pageshow', function () {
+    var busy = document.querySelectorAll('button[aria-busy="true"]');
+    for (var i = 0; i < busy.length; i++) {
+      busy[i].innerHTML = busy[i].getAttribute('data-label') || busy[i].innerHTML;
+      busy[i].removeAttribute('aria-busy'); busy[i].disabled = false;
+    }
+  });
+})();
+</script>
 </body>
 </html>
