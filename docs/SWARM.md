@@ -21,6 +21,12 @@ cycles on one item it is marked escalated in `docs/NEXT.md` and described in
 next cycle the director replans the item smaller. Paste `workspace/ESCALATE.md` or the run
 file into a Claude session to get it unstuck by hand.
 
+Each cycle records that it began and how it ended in `workspace/state.json`. A cycle that
+began and never ended (the machine slept, the window was closed) is named in `forever.log`
+at the next start instead of vanishing. Every builder, fixer and critic call is bounded by
+`AIDER_TIMEOUT` (default 40 minutes); when it fires, the cycle moves on and records it.
+A critic that says "Nothing found" about an empty diff is recorded as `empty`, not clean.
+
 Without `ANTHROPIC_API_KEY` set, everything runs local: the director never runs, so the
 swarm works through the existing Now list and then checks every ten minutes until someone
 fills it.
@@ -46,7 +52,8 @@ lower it. Check Hugging Face for a newer 14B coding model at the time.
 - The builder works on a throwaway branch. It never sees main.
 - The critic runs in ask mode. It cannot edit a file. The fixer cannot edit tests.
 - The guard: if the builder touches requirements, the bible, the workflow, the swarm, the
-  prompts or the ledger, the branch goes to review no matter what.
+  prompts, the ledger, the decisions, Keystone's record (`docs/KEYSTONE.md`) or `.claude/`,
+  the branch goes to review no matter what.
 - Only a branch with passing tests, a clean critic and a clean guard goes to `build/`, and
   GitHub runs the tests again before it merges. Everything else goes to `review/`.
 - Cooper can revert anything.
@@ -83,6 +90,8 @@ lower it. Check Hugging Face for a newer 14B coding model at the time.
    & "C:\Program Files\Git\bin\bash.exe" swarm/forever.sh
    ```
    It runs until you create a file named `swarm/STOP` (from another window: `New-Item swarm/STOP`).
+   The file stays after the swarm stops; delete it before starting the swarm again, so a stop
+   is never undone by a restart you did not mean.
    Its log is `workspace/runs/forever.log`, one file per cycle beside it. Warnings about the
    console or prompt toolkit are harmless. For a single cycle, run `swarm/run.sh` instead.
 
@@ -91,6 +100,8 @@ lower it. Check Hugging Face for a newer 14B coding model at the time.
 - Tests pass and critic says "Nothing found": pushed as `build/<date>`. GitHub runs the tests
   again, opens a pull request, and merges it. Nobody clicks anything.
 - Anything else: pushed as `review/<date>`. It waits. Nothing merges on its own.
+- A `build/` branch that has not merged after 30 minutes is kept as `review/<date>-stuck` and
+  noted in `workspace/ESCALATE.md`, and the swarm moves on. Nothing unmerged is ever deleted.
 
 ## Once in GitHub settings
 

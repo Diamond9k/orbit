@@ -6,6 +6,9 @@
     python swarm/state.py reset          clear the count for it
     python swarm/state.py escalate "why" mark it escalated in NEXT.md, append to workspace/ESCALATE.md
     python swarm/state.py needs_director yes if Now is empty or its top item is escalated
+    python swarm/state.py begin STAMP     record that cycle STAMP started
+    python swarm/state.py end STAMP "how" record that it finished and how
+    python swarm/state.py unfinished     the stamp of a cycle that began and never ended, if any
 """
 import json
 import os
@@ -74,6 +77,24 @@ def main(argv: list[str]) -> None:
         print(f"escalated: {top}")
     elif cmd == "needs_director":
         print("yes" if (not top or top_is_escalated()) else "no")
+    elif cmd == "begin":
+        # Durable mark that a cycle started. If "end" never follows, the next start can say so
+        # instead of the cycle vanishing without a trace (as the 2026-10-28 22:15 cycle did).
+        stamp = argv[2]
+        d["cycle"] = {"stamp": stamp, "item": top, "ended": None, "how": None}
+        save(d)
+        print(f"cycle {stamp} began on: {top or '(nothing in Now)'}")
+    elif cmd == "end":
+        stamp, how = argv[2], argv[3] if len(argv) > 3 else ""
+        cycle = d.get("cycle") or {}
+        if cycle.get("stamp") == stamp:
+            cycle.update(ended=True, how=how)
+            d["cycle"] = cycle
+            save(d)
+        print(f"cycle {stamp} ended: {how}")
+    elif cmd == "unfinished":
+        cycle = d.get("cycle") or {}
+        print(cycle.get("stamp", "") if cycle and not cycle.get("ended") else "")
 
 
 if __name__ == "__main__":

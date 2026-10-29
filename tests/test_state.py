@@ -40,3 +40,30 @@ def test_needs_director_when_now_empty(tmp_path, monkeypatch):
     nxt = tmp_path / "NEXT.md"; nxt.write_text("# x\n\n## Now\n\n## Then\n1. **a**\n")
     monkeypatch.setattr(state, "NEXT", str(nxt))
     assert state.top_item() == ""
+
+
+def test_cycle_begin_and_end_are_remembered(tmp_path, monkeypatch):
+    nxt = tmp_path / "NEXT.md"; nxt.write_text(NEXT)
+    monkeypatch.setattr(state, "NEXT", str(nxt))
+    monkeypatch.setattr(state, "STATE", str(tmp_path / "state.json"))
+    assert state.load().get("cycle") is None
+    state.main(["x", "begin", "2026-10-29-0100"])
+    c = state.load()["cycle"]
+    assert c["stamp"] == "2026-10-29-0100" and c["item"] == "First item." and not c["ended"]
+    # a cycle that began and never ended is visible to the next start
+    import io, contextlib
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        state.main(["x", "unfinished"])
+    assert out.getvalue().strip() == "2026-10-29-0100"
+    state.main(["x", "end", "2026-10-29-0100", "tests=pass critic=clean guard=ok branch=build/x"])
+    c = state.load()["cycle"]
+    assert c["ended"] is True and c["how"].startswith("tests=pass")
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        state.main(["x", "unfinished"])
+    assert out.getvalue().strip() == ""
+    # ending a different stamp does not overwrite the record of the one that began
+    state.main(["x", "begin", "2026-10-29-0200"])
+    state.main(["x", "end", "2026-10-29-0100", "late"])
+    assert state.load()["cycle"]["stamp"] == "2026-10-29-0200" and not state.load()["cycle"]["ended"]
