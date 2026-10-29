@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import patch
 from host.orbit_host import send_heartbeat
+import urllib.error
 
 class TestHost(unittest.TestCase):
     @patch('urllib.request.urlopen')
