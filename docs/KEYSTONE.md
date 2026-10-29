@@ -65,11 +65,11 @@ Cooper's yes.
 ## Open questions only Cooper can close
 
 1. **Milestone.** Confirm or replace the proposed first milestone above.
-2. **Sealing the chat.** Rule 1 needs a cipher in the host program. The host program is
-   standard library only, and the standard library has no authenticated cipher or key
-   exchange. Options: add one proven library (PyNaCl or cryptography) to the host program and
-   package it with the app, or keep the relay unsealed and say so. Keystone's recommendation:
-   add the library. Until decided, the relay carries plain text and the page says so.
+2. **Sealing the chat.** Closed in practice on 2026-10-29. Cooper set the privacy goal (protect
+   the conversation from Orbit and from the host) and asked for a prototype; Keystone chose the
+   `cryptography` package for the host program and WebCrypto P-256 with AES-GCM in the browser
+   (docs/decisions/2026-10-29-protected-compute-boundary.md). One line to change. What remains
+   is question 8.
 3. **GitHub protection.** The `tests` ruleset on main requires zero status checks (its
    `required_status_checks` list is empty) and the classic protection requires zero approving
    reviews. Auto-merge therefore does not wait for the tests check on the pull request itself;
@@ -88,9 +88,73 @@ Cooper's yes.
    runs**, **Codex as second critic**, **blind gauntlet or single critic**: carried over from
    `.claude/agents/orbit-director.md` section 9.
 
+8. **The verified tier.** The four decisions at the end of docs/PRIVACY.md: keep the library
+   choice; pursue attested hosts, and who provides the first attested machine; let a page that
+   never receives the host's key send unsealed (today: yes, labelled) or refuse; build a TPM
+   "measured" label for community hosts or not.
+
 ## Continuity log
 
 Newest first. Each entry: date, what changed, evidence, what is next.
+
+### 2026-10-29 03:05 CDT (UTC-05:00) (second build run: the privacy goal, sealing, the protected-compute boundary)
+
+**Cooper's direction, received this run, verbatim.** "Orbit's privacy goal is to protect the
+user's prompts, answers, and session state from both Orbit and the hardware owner. Treat
+encryption between the browser and host as one necessary piece, not the finished solution.
+Research and prototype a verifiable protected-compute boundary, including whether independent
+consumer hardware can participate safely. Keep the existing work reviewable, and distinguish
+controlled tests from proof of a private real-world session." Earlier in the same sitting:
+"clean the github" and "merge what needs to be merged".
+
+**What changed.** Branch `keystone/protected-compute`, on top of `keystone/first-session`,
+opened as pull request 24.
+- Sealing built. `host/seal.py` and `orbit/static/seal.js`: ECDH P-256, HKDF-SHA256, AES-256-GCM,
+  counter nonces authenticated as associated data, a new epoch per browser tab. The host program
+  offers its key the moment the model is ready and answers sealed messages sealed. The session
+  page shows "Sealed from Orbit" together with "the host's machine can read this conversation",
+  or "Unsealed" when no key came or the page is not on https. Orbit's own code changed in one
+  constant, the message size limit. The host program now needs the `cryptography` package.
+- `docs/PRIVACY.md`: who sees what in each tier, what a verifiable boundary is, whether consumer
+  hardware can offer one (it cannot), the physical-attack caveat for independent hosts, evidence
+  by kind, four decisions for Cooper, fourteen sources read this run.
+  `docs/decisions/2026-10-29-protected-compute-boundary.md` records Cooper's goal and Keystone's
+  reading of it. `docs/NEXT.md` and README follow.
+
+**Evidence, by kind.**
+- Code-supported and unit-tested: 50 tests pass (9 new). Python round trips; tampered, replayed
+  and reordered envelopes refused; re-keying; the real `seal.js` run under Node against
+  `seal.py`; the host program's sealed flow, its notice when it cannot open an envelope, its
+  plain-text fallback, and its behaviour without the package; Orbit storing envelopes byte for
+  byte.
+- Controlled test, Cooper's PC as both roles, scripted user, dev funds:
+  `docs/evidence/2026-10-29-sealed-session-e2e.md`. Key offered at ready with attestation
+  `none`; two sealed questions answered by the real model in 1.5 s and 0.5 s; Orbit's database
+  held six envelopes and none of the words; one cent charged; the host-lost path intact, and the
+  previous run's `last_seen` fix confirmed (the session ended at the host's last heartbeat).
+- Not shown: the real session page driven by a browser (no browser driver in the repo);
+  protection from the host; protection from an Orbit that swaps keys during the hello exchange;
+  any stranger, any real money.
+
+**The answer to Cooper's question.** Independent consumer hardware cannot offer a boundary a
+browser can verify: Ryzen has no SEV-SNP, Intel Core lost SGX and never had TDX, GeForce and
+Radeon have no confidential mode, Arm CCA is not in shipping consumer devices. It can take part
+as a community host, labelled "the host can read this". A verified host needs EPYC or Xeon with
+SEV-SNP or TDX and an H100-class or RTX PRO 6000 Blackwell Server Edition GPU, and even then the
+2025 interposer attacks mean the label must read "protected from the owner's software", never
+"protected from the owner".
+
+**GitHub cleanup.** Pull requests 22 and 23 were green and conflict-free and ten branches were
+merged or superseded; this session's permission classifier blocked both the merge and the branch
+deletions, so the exact commands were handed to Cooper to run. Their state at the time of writing
+is whatever the pull request pages say; Keystone did not merge anything.
+
+**Decisions now Cooper's.** Questions 3 to 8 below; 2 is closed in practice. Merge or send back
+pull requests 22, 23 and 24.
+
+**Next meaningful step.** After review: the host program installs like an app, so a stranger can
+be a community host. If the verified tier is a go: the first attested machine and a browser-side
+verifier, in that order.
 
 ### 2026-10-29 01:16 CDT (UTC-05:00) (first build run, same session as the birth)
 

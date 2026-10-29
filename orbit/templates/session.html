@@ -65,12 +65,31 @@
     <input id="msg" class="form-control" placeholder="Say something to the model" autofocus maxlength="64000">
     <button class="btn btn-primary">Send</button>
   </form>
-  <div class="text-secondary small mt-2">Messages pass through Orbit's relay unsealed for now and are deleted when the session ends. The host's machine runs the model and sees this conversation.</div>
+  <div class="d-flex align-items-start gap-2 mt-2 small">
+    <span id="seal-state" class="badge text-bg-secondary">Waiting for the host's key</span>
+    <span id="seal-note" class="text-secondary">Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it.</span>
+  </div>
 </div></div>
+<script src="/static/seal.js"></script>
 <script>
 (function () {
   var sid = {{ s.id }}, after = 0, seen = {}, thinking = null;
   var log = document.getElementById('chat'), form = document.getElementById('say'), input = document.getElementById('msg');
+  var badge = document.getElementById('seal-state'), note = document.getElementById('seal-note');
+  var STORE = 'orbit-seal-' + sid, WAIT_FOR_KEY_MS = 10000, loadedAt = Date.now();
+  var sealer = null, state = 'waiting', lastHostHello = null, needHello = false, foreign = false;
+  // Every sentence here must stay exactly true (rule 5). See docs/PRIVACY.md.
+  var copy = {
+    waiting: ['text-bg-secondary', "Waiting for the host's key",
+      "Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it."],
+    sealed: ['text-bg-success', 'Sealed from Orbit',
+      "Orbit relays envelopes it cannot open and deletes them when the session ends. The host's machine runs the model and can read this conversation; nothing checks that machine yet."],
+    unsealed: ['text-bg-warning', 'Unsealed',
+      "This host's program offered no key, so messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too."],
+    insecure: ['text-bg-warning', 'Unsealed',
+      "This page was not opened over https, so the browser cannot seal. Messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too."]
+  };
+  function setState(s) { state = s; badge.className = 'badge ' + copy[s][0]; badge.textContent = copy[s][1]; note.textContent = copy[s][2]; }
   function add(sender, text, extra) {
     var d = document.createElement('div');
     d.className = 'msg msg-' + sender + (extra ? ' ' + extra : '');
@@ -78,38 +97,85 @@
     log.appendChild(d); log.scrollTop = log.scrollHeight;
     return d;
   }
-  function show(m) {
+  function keep(s) { s.export().then(function (k) { try { sessionStorage.setItem(STORE, JSON.stringify(k)); } catch (e) {} }).catch(function () {}); }
+  async function sealerFor() {
+    if (sealer) return sealer;
+    try { var saved = sessionStorage.getItem(STORE); if (saved) sealer = await OrbitSeal.restore(sid, 'user', JSON.parse(saved)); } catch (e) { sealer = null; }
+    if (!sealer) { sealer = await OrbitSeal.create(sid, 'user'); keep(sealer); }
+    return sealer;
+  }
+  function post(body) {
+    return fetch('/sessions/' + sid + '/messages', {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'body=' + encodeURIComponent(body)});
+  }
+  async function sendHello() {
+    needHello = false;
+    var r = await post(sealer.hello());
+    if (r.ok) { var j = await r.json(); seen[j.id] = true; }
+  }
+  async function show(m) {
     if (seen[m.id]) return;
     seen[m.id] = true; after = Math.max(after, m.id);
+    var env = OrbitSeal.available ? OrbitSeal.parse(m.body) : null;
+    if (env && env.t === 'hello') {
+      if (env.from === 'host') {
+        lastHostHello = env;
+        try { await (await sealerFor()).accept(env); needHello = true; foreign = false; setState('sealed'); }
+        catch (e) { add('system', 'The host offered a key this browser could not use: ' + e.message, 'text-warning'); }
+      } else if (sealer && env.pk === sealer.publicB64) { needHello = false; foreign = false; }
+      else { foreign = true; }  // another tab answered the host, so its key is current and ours is not
+      return;
+    }
     if (m.sender === 'host' && thinking) { thinking.remove(); thinking = null; }
+    if (env && env.t === 'msg') {
+      if (!sealer || !sealer.ready() || foreign) { add('system', 'A sealed message this tab cannot open.', 'text-secondary'); return; }
+      try { add(m.sender, await sealer.unseal(env)); }
+      catch (e) { add('system', 'A sealed message this tab cannot open (' + e.message + ').', 'text-secondary'); }
+      return;
+    }
     add(m.sender, m.body);
   }
-  function poll() {
-    fetch('/sessions/' + sid + '/messages?after=' + after + '&wait=15', {credentials: 'same-origin'})
-      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (d) {
-        d.messages.forEach(show);
-        if (d.ended) { location.reload(); return; }
-        setTimeout(poll, 100);
-      })
-      .catch(function () { setTimeout(poll, 3000); });
+  async function poll() {
+    try {
+      var r = await fetch('/sessions/' + sid + '/messages?after=' + after + '&wait=15', {credentials: 'same-origin'});
+      if (!r.ok) throw new Error(r.status);
+      var d = await r.json();
+      for (var i = 0; i < d.messages.length; i++) await show(d.messages[i]);
+      if (needHello && sealer && sealer.ready() && !foreign) await sendHello();
+      if (state === 'waiting' && Date.now() - loadedAt > WAIT_FOR_KEY_MS) setState('unsealed');
+      if (d.ended) { location.reload(); return; }
+      setTimeout(poll, 100);
+    } catch (e) { setTimeout(poll, 3000); }
   }
-  form.addEventListener('submit', function (e) {
+  form.addEventListener('submit', async function (e) {
     e.preventDefault();
     var text = input.value.trim();
     if (!text) return;
+    if (state === 'waiting') { add('system', "Waiting for the host's key. Try again in a moment.", 'text-secondary'); return; }
     input.value = '';
-    fetch('/sessions/' + sid + '/messages', {method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'body=' + encodeURIComponent(text)})
-      .then(function (r) {
-        if (!r.ok) { return r.json().then(function (j) { add('system', 'Not sent: ' + (j.detail || r.status), 'text-warning'); }); }
-        return r.json().then(function (j) {
-          show({id: j.id, sender: 'user', body: text});
-          if (!thinking) thinking = add('host', 'Thinking…', 'text-secondary');
-        });
-      })
-      .catch(function () { add('system', 'Not sent: Orbit did not answer.', 'text-warning'); });
+    var body = text;
+    if (state === 'sealed') {
+      try {
+        if (foreign) { sealer = await OrbitSeal.create(sid, 'user'); keep(sealer); await sealer.accept(lastHostHello); foreign = false; await sendHello(); }
+        body = await sealer.seal(text);
+      } catch (err) { add('system', 'Not sent: could not seal (' + err.message + ').', 'text-warning'); return; }
+    }
+    try {
+      var r = await post(body);
+      if (!r.ok) {
+        if (state === 'sealed') sealer.sent -= 1;  // the host never saw this number
+        var j = await r.json(); add('system', 'Not sent: ' + (j.detail || r.status), 'text-warning'); return;
+      }
+      var ok = await r.json();
+      seen[ok.id] = true;
+      add('user', text);
+      if (!thinking) thinking = add('host', 'Thinking…', 'text-secondary');
+    } catch (err) {
+      if (state === 'sealed') sealer.sent -= 1;
+      add('system', 'Not sent: Orbit did not answer.', 'text-warning');
+    }
   });
+  setState(OrbitSeal.available ? 'waiting' : 'insecure');
   poll();
 })();
 </script>

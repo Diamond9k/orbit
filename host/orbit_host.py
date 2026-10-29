@@ -2,7 +2,8 @@
 
     python host/orbit_host.py
 
-Put the token from the Hosts page in host/token.txt. Standard library only.
+Put the token from the Hosts page in host/token.txt. Needs the cryptography package for
+sealing (python -m pip install -r host/requirements.txt); the rest is the standard library.
 It only dials out, so it works behind a home router with nothing to configure.
 
 Every few seconds it sends a heartbeat. When Orbit's reply names a session, it starts
@@ -10,6 +11,12 @@ llama.cpp's server for that model (which downloads the GGUF from Hugging Face th
 time), waits until the server answers, then tells Orbit the machine is ready. Billing
 starts only then. While the session runs it asks Orbit for the user's messages, puts each
 one to the model, and posts the answer back. When the session ends, it stops the server.
+
+Once the machine is ready it offers the browser a key, and from then on the conversation is
+sealed: Orbit relays envelopes it cannot open (see host/seal.py and docs/PRIVACY.md). This
+machine still sees the conversation in plain text, because the model runs here, and the page
+tells the user so. If the cryptography package is missing, or the browser never answers the
+offer, messages pass unsealed and the page says that instead.
 
 Settings, all optional, as environment variables:
     ORBIT_URL        where Orbit runs (default http://localhost:8000)
@@ -27,7 +34,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-ORBIT_URL = os.environ.get("ORBIT_URL", "http://localhost:8000").rstrip("/")
+try:
+    import seal  # host/seal.py, beside this file; needs the cryptography package
+except ImportError:  # run unsealed, and say so
+    seal = None
+
+ORBIT_URL =os.environ.get("ORBIT_URL", "http://localhost:8000").rstrip("/")
 HEARTBEAT_URL = ORBIT_URL + "/api/hosts/heartbeat"
 READY_URL = ORBIT_URL + "/api/hosts/ready"
 INBOX_URL = ORBIT_URL + "/api/hosts/inbox"
@@ -138,6 +150,12 @@ def ask_model(transcript, port=LLAMA_PORT):
     return data["choices"][0]["message"]["content"]
 
 
+def attestation():
+    """What this machine can prove about itself to the browser. Nothing yet: consumer hardware has
+    no enclave a browser could check (docs/PRIVACY.md), so the page says the host can read the chat."""
+    return {"kind": "none"}
+
+
 class Runner:
     """Keeps at most one model server running, for the session Orbit named, and relays its chat."""
 
@@ -148,8 +166,10 @@ class Runner:
         self.session_id = None
         self.proc = None
         self.ready_sent = False
-        self.transcript = []  # the conversation so far, oldest first; lives only in memory
-        self.after = 0  # the newest message id seen
+        self.transcript = []  # the conversation in plain text, oldest first; lives only in memory
+        self.after = 0  # the newest relay message id seen
+        self.sealer = None  # this session's keys, once the browser has answered our hello
+        self.sealed = False  # whether the user's latest message came sealed; answers go back the same way
 
     def step(self, session):
         if session is None or session.get("id") != self.session_id:
@@ -169,6 +189,59 @@ class Runner:
             self.ready_sent = self.ready(self.token)
             if self.ready_sent:
                 print("model ready")
+                self.offer_seal()
+
+    def offer_seal(self):
+        """Post this machine's public key so the browser can seal the conversation."""
+        if seal is None:
+            print("sealing unavailable (python -m pip install -r host/requirements.txt); the conversation passes unsealed")
+            return
+        self.sealer = seal.Sealer(self.session_id, "host")
+        self.post(self.sealer.hello(attestation()))
+
+    def post(self, body):
+        """Post one message to the relay. Returns its id, or None if Orbit did not take it."""
+        mid = self.reply(self.token, self.session_id, body)
+        if mid:
+            self.after = max(self.after, mid)
+        return mid
+
+    def say(self, text):
+        """Send text to the user, sealed when the conversation is sealed. Returns the message id or None."""
+        if self.sealed and self.sealer is not None and self.sealer.ready:
+            return self.post(self.sealer.seal(text))
+        return self.post(text)
+
+    def take(self, m):
+        """One message from the user: the browser's hello, a sealed message, or plain text.
+
+        Returns the plain text to answer, or None when there is nothing to answer.
+        """
+        env = seal.parse(m["body"]) if seal is not None else None
+        if env is None:  # plain text: an older page, or a browser that never got our key
+            self.sealed = False
+            return m["body"]
+        if env["t"] == "hello":
+            if self.sealer is None:
+                self.sealer = seal.Sealer(self.session_id, "host")
+            try:
+                self.sealer.accept(env)  # a new browser tab re-keys; its attestation is not checked here
+                self.sealed = True
+                print("conversation sealed")
+            except seal.SealError as e:
+                print(f"bad hello from the browser: {e}")
+            return None
+        if self.sealer is None or not self.sealer.ready:
+            self.say("Your message arrived sealed, but this machine has no key for it. Reload the page.")
+            return None
+        try:
+            text = self.sealer.unseal(env)
+        except seal.SealError as e:
+            print(f"could not open a sealed message: {e}")
+            self.say("A sealed message could not be opened. Reload the page to start a new key.")
+            return None
+        self.sealed = True
+        return text
 
     def relay(self):
         """One round of the conversation: fetch what the user said, answer it, post the answer.
@@ -184,18 +257,21 @@ class Runner:
             self.stop()
             return
         for m in got.get("messages", []):
-            if m["id"] > self.after:
-                self.transcript.append(m)
-                self.after = m["id"]
+            if m["id"] <= self.after:
+                continue
+            self.after = m["id"]
+            if m["sender"] != "user":
+                continue  # our own hello or answer, echoed back by the relay
+            text = self.take(m)
+            if text is not None:
+                self.transcript.append({"sender": "user", "body": text})
         if self.transcript and self.transcript[-1]["sender"] == "user":
             try:
                 answer = self.ask(self.transcript)
             except Exception as e:  # the model server failed; say so plainly instead of going quiet
                 answer = f"The model did not answer: {e}"
-            mid = self.reply(self.token, self.session_id, answer)
-            if mid:
-                self.transcript.append({"id": mid, "sender": "host", "body": answer})
-                self.after = max(self.after, mid)
+            if self.say(answer):
+                self.transcript.append({"sender": "host", "body": answer})
 
     def stop(self):
         if self.proc is not None:
@@ -207,6 +283,7 @@ class Runner:
                 self.proc.kill()
         self.proc, self.session_id, self.ready_sent = None, None, False
         self.transcript, self.after = [], 0
+        self.sealer, self.sealed = None, False
 
 
 def main():

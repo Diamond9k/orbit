@@ -265,7 +265,12 @@ def test_chat_is_relayed_and_dropped_with_the_session(client):
     assert time.monotonic() - t0 >= 0.5
     # the session page shows the chat, honestly labelled
     page = client.get("/sessions/1").text
-    assert 'id="chat"' in page and "unsealed for now" in page
+    assert 'id="chat"' in page and 'id="seal-state"' in page and "/static/seal.js" in page
+    assert client.get("/static/seal.js").status_code == 200
+    # Orbit stores whatever the ends send, byte for byte: an envelope is just a body to it
+    envelope = '{"v":1,"t":"msg","from":"user","n":1,"ct":"AAECAwQ="}'
+    mid = client.post("/sessions/1/messages", data={"body": envelope}).json()["id"]
+    assert [m["body"] for m in client.get(f"/sessions/1/messages?after={mid - 1}&wait=0").json()["messages"]] == [envelope]
     # someone else cannot read it
     with TestClient(app) as other:
         other.post("/signup", data={"email": "o@b.co", "password": "longenough"}, follow_redirects=False)

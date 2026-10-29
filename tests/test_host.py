@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import urllib.error
@@ -59,22 +60,25 @@ class FakeProc:
 
 
 def test_runner_starts_model_then_says_ready_once():
-    procs, up, readies = [], [False], []
+    procs, up, readies, posted = [], [False], [], []
     r = orbit_host.Runner("tok", popen=lambda a: procs.append(FakeProc(a)) or procs[-1],
-                          server_up=lambda: up[0], ready=lambda t: readies.append(t) or True)
+                          server_up=lambda: up[0], ready=lambda t: readies.append(t) or True,
+                          reply=lambda t, sid, body: posted.append((sid, body)) or len(posted))
     s = {"id": 1, "model": "o/M-GGUF Q4_K_M"}
     r.step(s)
-    assert len(procs) == 1 and "o/M-GGUF:Q4_K_M" in procs[0].args and readies == []
+    assert len(procs) == 1 and "o/M-GGUF:Q4_K_M" in procs[0].args and readies == [] and posted == []
     up[0] = True
     r.step(s)
     r.step(s)
     assert readies == ["tok"] and len(procs) == 1
+    assert len(posted) == 1 and posted[0][0] == 1 and json.loads(posted[0][1])["t"] == "hello"  # the key offer, once
     # session ends: server stopped
     r.step(None)
-    assert procs[0].stopped and r.proc is None
-    # a new session gets a fresh server
+    assert procs[0].stopped and r.proc is None and r.sealer is None
+    # a new session gets a fresh server and a fresh key offer
     r.step({"id": 2, "model": "o/N-GGUF"})
     assert len(procs) == 2 and r.session_id == 2
+    assert len(posted) == 2 and posted[1][0] == 2 and json.loads(posted[1][1])["pk"] != json.loads(posted[0][1])["pk"]
 
 
 def test_runner_restarts_a_crashed_server():
@@ -90,26 +94,31 @@ def test_runner_restarts_a_crashed_server():
     assert len(procs) == 2
 
 
+def _odd_ids(posted):
+    """A fake reply(): the relay numbers the host's posts 3, 5, 7...; the tests give user messages even ids."""
+    return lambda t, sid, body: posted.append(body) or len(posted) * 2 + 1
+
+
 def test_runner_relays_the_conversation():
     replies = [
-        {"session": {"id": 1, "model": "m"}, "messages": [{"id": 1, "sender": "user", "body": "hi"}]},
+        {"session": {"id": 1, "model": "m"}, "messages": [{"id": 4, "sender": "user", "body": "hi"}]},
         {"session": {"id": 1, "model": "m"}, "messages": []},
         {"session": None, "messages": []},
     ]
     asked, posted, inboxes = [], [], []
     r = orbit_host.Runner("tok", popen=lambda a: FakeProc(a), server_up=lambda: True, ready=lambda t: True,
                           inbox=lambda t, after: inboxes.append(after) or replies.pop(0),
-                          reply=lambda t, sid, body: posted.append((sid, body)) or 2,
+                          reply=_odd_ids(posted),
                           ask=lambda transcript: asked.append([m["body"] for m in transcript]) or "hello")
     r.step({"id": 1, "model": "m"})
-    assert r.ready_sent
-    r.relay()  # a user message arrives: the model is asked with the whole transcript, the answer is posted
-    assert asked == [["hi"]] and posted == [(1, "hello")]
-    assert [m["body"] for m in r.transcript] == ["hi", "hello"] and r.after == 2
+    assert r.ready_sent and len(posted) == 1 and json.loads(posted[0])["t"] == "hello" and r.after == 3  # the key offer
+    r.relay()  # a plain user message arrives: the model is asked with the whole transcript, the answer is posted plain
+    assert asked == [["hi"]] and posted[1] == "hello"
+    assert [m["body"] for m in r.transcript] == ["hi", "hello"] and r.after == 5
     r.relay()  # nothing new: the model is not asked again
-    assert asked == [["hi"]] and inboxes == [0, 2]
+    assert asked == [["hi"]] and inboxes == [3, 5]
     r.relay()  # Orbit says the session is over: the server stops, the transcript is dropped
-    assert r.proc is None and r.transcript == [] and r.after == 0
+    assert r.proc is None and r.transcript == [] and r.after == 0 and r.sealer is None
 
 
 def _raise(exc):
@@ -120,12 +129,61 @@ def test_runner_tells_the_user_when_the_model_fails():
     posted = []
     r = orbit_host.Runner("tok", popen=lambda a: FakeProc(a), server_up=lambda: True, ready=lambda t: True,
                           inbox=lambda t, after: {"session": {"id": 1, "model": "m"},
-                                                  "messages": [{"id": 1, "sender": "user", "body": "hi"}]},
-                          reply=lambda t, sid, body: posted.append(body) or 2,
+                                                  "messages": [{"id": 4, "sender": "user", "body": "hi"}]},
+                          reply=_odd_ids(posted),
                           ask=lambda transcript: _raise(OSError("connection refused")))
     r.step({"id": 1, "model": "m"})
     r.relay()
-    assert posted == ["The model did not answer: connection refused"]
+    assert posted[-1] == "The model did not answer: connection refused"
+
+
+def test_runner_seals_the_conversation_when_the_browser_answers():
+    import seal
+    inbox_q, asked, posted = [], [], []
+    running = {"session": {"id": 1, "model": "m"}}
+    r = orbit_host.Runner("tok", popen=lambda a: FakeProc(a), server_up=lambda: True, ready=lambda t: True,
+                          inbox=lambda t, after: inbox_q.pop(0), reply=_odd_ids(posted),
+                          ask=lambda transcript: asked.append([(m["sender"], m["body"]) for m in transcript]) or "Pong")
+    r.step({"id": 1, "model": "m"})
+    browser = seal.Sealer(1, "user")
+    assert browser.accept(posted[0]) == {"kind": "none"}  # the host's hello; nothing to attest with yet
+    inbox_q.append(dict(running, messages=[{"id": 4, "sender": "user", "body": browser.hello()}]))
+    r.relay()
+    assert r.sealed and r.sealer.ready and asked == []  # a hello is not a question for the model
+    inbox_q.append(dict(running, messages=[{"id": 6, "sender": "user", "body": browser.seal("ping?")}]))
+    r.relay()
+    assert asked == [[("user", "ping?")]]  # the model saw plain text
+    assert "ping" not in posted[-1] and "Pong" not in posted[-1]  # the relay saw none of it
+    assert browser.unseal(posted[-1]) == "Pong"
+    # an envelope the host cannot open gets a sealed notice, not silence, and never reaches the model
+    inbox_q.append(dict(running, messages=[{"id": 8, "sender": "user", "body": posted[-1]}]))  # its own envelope bounced back
+    r.relay()
+    assert "could not be opened" in browser.unseal(posted[-1]) and asked == [[("user", "ping?")]]
+    # a new browser tab re-keys and the conversation goes on
+    tab2 = seal.Sealer(1, "user")
+    tab2.accept(posted[0])
+    inbox_q.append(dict(running, messages=[{"id": 10, "sender": "user", "body": tab2.hello()},
+                                           {"id": 12, "sender": "user", "body": tab2.seal("still there?")}]))
+    r.relay()
+    assert asked[-1][-1] == ("user", "still there?") and tab2.unseal(posted[-1]) == "Pong"
+    # plain text from an older page is answered in plain text
+    inbox_q.append(dict(running, messages=[{"id": 14, "sender": "user", "body": "plain"}]))
+    r.relay()
+    assert posted[-1] == "Pong" and r.sealed is False
+
+
+def test_runner_runs_unsealed_without_the_cryptography_package(monkeypatch):
+    monkeypatch.setattr(orbit_host, "seal", None)
+    posted, asked = [], []
+    r = orbit_host.Runner("tok", popen=lambda a: FakeProc(a), server_up=lambda: True, ready=lambda t: True,
+                          inbox=lambda t, after: {"session": {"id": 1, "model": "m"},
+                                                  "messages": [{"id": 1, "sender": "user", "body": "hi"}]},
+                          reply=lambda t, sid, body: posted.append(body) or 2,
+                          ask=lambda transcript: asked.append(1) or "hello")
+    r.step({"id": 1, "model": "m"})
+    assert posted == [] and r.sealer is None  # no key to offer
+    r.relay()
+    assert posted == ["hello"]
 
 
 def test_ask_model_sends_the_conversation_as_roles():

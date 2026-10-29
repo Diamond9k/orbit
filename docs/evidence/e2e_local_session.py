@@ -25,6 +25,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 SCRATCH = os.path.join(REPO, "workspace", "runs", "e2e")  # gitignored
 os.makedirs(SCRATCH, exist_ok=True)
+sys.path.insert(0, os.path.join(REPO, "host"))
+import seal  # noqa: E402  (the browser's half of the sealing, played here in Python)
 DB = os.path.join(SCRATCH, "e2e.db")
 ORBIT_PORT = 8020
 LLAMA_PORT = 8091
@@ -138,25 +140,43 @@ def main():
         ready_row = q("SELECT ready_at FROM sessions WHERE id = 1")[0]["ready_at"]
         say(f"host said ready after {time.monotonic() - t_start:.1f}s (ready_at {ready_row} UTC); billing starts here")
 
+        # the host offers its key; this script plays the browser's half with host/seal.py
         after = 0
-        for prompt in ["Reply with exactly one word: pong", "Which word did you just reply with? Answer in one short sentence."]:
-            t_q = time.monotonic()
-            r = c.post("/sessions/1/messages", data={"body": prompt})
-            assert r.status_code == 200, r.text
-            say(f"user sent message {r.json()['id']}: {prompt!r}")
-            got = None
+        browser = seal.Sealer(1, "user")
+
+        def pull(after, want):
+            """Read messages after `after` until one satisfies `want`. Returns (that message, new after)."""
             deadline = time.monotonic() + 300
-            while time.monotonic() < deadline and not got:
+            while time.monotonic() < deadline:
                 d = c.get("/sessions/1/messages", params={"after": after, "wait": 20}, timeout=60).json()
                 for m in d["messages"]:
                     after = max(after, m["id"])
-                    if m["sender"] == "host":
-                        got = m
-            assert got, "no answer from the model"
-            say(f"model answered in {time.monotonic() - t_q:.1f}s: {got['body']!r}")
+                    if want(m):
+                        return m, after
+            raise TimeoutError("the message never came")
+
+        hello, after = pull(after, lambda m: m["sender"] == "host" and (seal.parse(m["body"]) or {}).get("t") == "hello")
+        att = browser.accept(hello["body"])
+        r = c.post("/sessions/1/messages", data={"body": browser.hello()})
+        assert r.status_code == 200, r.text
+        after = max(after, r.json()["id"])
+        say(f"host offered its key (attestation: {att}); browser answered with its own; conversation sealed")
+        for prompt in ["Reply with exactly one word: pong", "Which word did you just reply with? Answer in one short sentence."]:
+            t_q = time.monotonic()
+            r = c.post("/sessions/1/messages", data={"body": browser.seal(prompt)})
+            assert r.status_code == 200, r.text
+            after = max(after, r.json()["id"])
+            say(f"user sent sealed message {r.json()['id']}: {prompt!r}")
+            got, after = pull(after, lambda m: m["sender"] == "host")
+            answer = browser.unseal(got["body"])
+            say(f"model answered in {time.monotonic() - t_q:.1f}s: {answer!r} (its envelope on the relay: {len(got['body'])} chars)")
+        stored = [row["body"] for row in q("SELECT body FROM messages WHERE session_id = 1")]
+        assert stored and all(seal.parse(b) is not None for b in stored), "Orbit holds something other than envelopes"
+        assert not any("pong" in b.lower() or "reply" in b.lower() for b in stored), "plain text reached Orbit"
+        say(f"Orbit's database holds {len(stored)} messages for the session: all envelopes, none containing the words")
 
         page = c.get("/sessions/1").text
-        assert 'id="chat"' in page and "unsealed for now" in page
+        assert 'id="chat"' in page and 'id="seal-state"' in page and "/static/seal.js" in page
         r = c.post("/sessions/1/stop")
         assert r.status_code == 303
         s = q("SELECT minutes, cost_cents, end_reason, ready_at, ended_at FROM sessions WHERE id = 1")[0]

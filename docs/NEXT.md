@@ -8,17 +8,19 @@ The previous builder failed by widening scope, so keep each item to its named fi
 
 
 ## Then
-5. **Seal the chat.** The relay exists and the chat works, unsealed. Make the browser and the
-   host program encrypt message bodies end to end so Orbit relays sealed envelopes it cannot
-   open; Orbit's own code does not change. Needs Cooper's decision on the host program's cipher
-   library (docs/KEYSTONE.md, question 2). Then stream tokens.
+5. **Verified hosts.** The protected-compute boundary designed in docs/PRIVACY.md: the model runs
+   inside enclave hardware (AMD SEV-SNP or Intel TDX, with NVIDIA confidential computing for the
+   GPU), the host program's session key is born inside it, and the browser checks the attestation
+   and the published measurement before it sends a word. Waits on Cooper: whether to pursue it and
+   who provides the first attested machine. Consumer hardware cannot do this; it stays community.
 6. **The guide.** Reacts to session events, not timers: model loaded, first answer sent, user
    idle, time running low, session ended. One tip per event, shown once. Answers questions
    from session data. Never sees the chat.
 7. **Hosts paid, live on the site.** One number from the ledger. The scoreboard.
-8. **Host tiers.** Verified for machines with enclave hardware that pass attestation,
-   community for everyone else. Labels earned by the hardware.
+8. **Host tiers on the pages.** "Verified" for machines that pass item 5, "community" for everyone
+   else, with the exact wording from docs/PRIVACY.md next to every machine and in every session.
 9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly.
+10. **Stream tokens** through the sealed relay: the host seals partial replies, the page appends them.
 
 ## Later
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
@@ -39,9 +41,14 @@ The previous builder failed by widening scope, so keep each item to its named fi
   `ORBIT_URL`), until it installs like an app.
 - Sessions end themselves on every request today; add a timer sweep in the app only if that
   proves too late in practice.
-- Stream tokens through the relay: the host posts partial replies, the page appends them.
 - The session page shows the conversation only while it runs; afterwards it says Orbit kept
   nothing. Let the user download their own transcript before stopping, from the browser.
+- Decide whether a page that never receives the host's key may send unsealed (today: yes, after
+  ten seconds, labelled) or must refuse. docs/PRIVACY.md, decision 3.
+- A "measured" label for community hosts whose TPM attests they booted the unmodified host
+  program. Integrity, not privacy; only worth it if the page can say that plainly.
+- The session page's key exchange has no automated browser test (no browser driver in the repo).
+  Add one before the verified tier, when the browser starts checking attestations.
 
 ## Done
 - v0.1 web app: sign-in, hardware-time store, double-entry ledger, model fit from the name,
@@ -76,4 +83,9 @@ The previous builder failed by widening scope, so keep each item to its named fi
 - The chat is relayed. The user's words reach the model on the host and the answer comes back:
   browser to `/sessions/{id}/messages`, host program long-polls `/api/hosts/inbox`, asks llama.cpp,
   posts `/api/hosts/reply`. Orbit keeps bodies only while the session runs, never reads them,
-  deletes them when it ends. Unsealed for now, and the page says so. Built by Keystone.
+  deletes them when it ends. Built by Keystone.
+- The chat is sealed. The host program offers a key when the model is ready, the browser answers
+  with its own, and from then on Orbit relays AES-GCM envelopes it cannot open (`host/seal.py`,
+  `orbit/static/seal.js`, checked against each other under Node). The page says "Sealed from
+  Orbit" and, in the same breath, that the host's machine can read the conversation. The research
+  on protecting it from the host too is `docs/PRIVACY.md`. Built by Keystone at Cooper's direction.
