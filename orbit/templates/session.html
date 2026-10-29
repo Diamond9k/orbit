@@ -18,6 +18,13 @@
     <div class="col-sm-4"><div class="text-secondary small">You paid</div><div class="stat-n">{{ s.cost_cents | dollars }}</div></div>
     <div class="col-sm-4"><div class="text-secondary small">Left</div><div class="stat-n">{{ balance | dollars }}</div></div>
   </div>
+  {% if s.end_reason == 'out_of_time' %}
+  <div class="text-secondary mt-3">Your hardware time ran out, so the session ended on its own. You were charged for the minutes you had.</div>
+  {% elif s.end_reason == 'host_lost' %}
+  <div class="text-secondary mt-3">The machine stopped answering, so the session ended. You were charged only up to the last minute it was reachable.</div>
+  {% elif s.end_reason == 'stopped' %}
+  <div class="text-secondary mt-3">You stopped it. The conversation ended with the session; Orbit does not keep it.</div>
+  {% endif %}
 </div></div>
 <div class="d-flex gap-2"><a class="btn btn-primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="btn btn-outline-light" href="/account">Account</a></div>
 {% elif not s.ready_at %}
@@ -47,13 +54,65 @@
     document.getElementById('elapsed').textContent = Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2);
     document.getElementById('cost').textContent = '$' + (cost / 100).toFixed(2);
     document.getElementById('left').textContent = left + ' min';
+    if (left <= 0 && !window.orbitReloading) { window.orbitReloading = true; setTimeout(function () { location.reload(); }, 3000); }
   }
   tick(); setInterval(tick, 1000);
 })();
 </script>
-<div class="chat-placeholder">
-  <div><i class="bi bi-chat-dots fs-1 d-block mb-2"></i>The chat connects here once the host program is running on this machine.</div>
-</div>
+<div class="card mb-3"><div class="card-body">
+  <div id="chat" class="chat-log mb-3" aria-live="polite"></div>
+  <form id="say" class="d-flex gap-2" autocomplete="off">
+    <input id="msg" class="form-control" placeholder="Say something to the model" autofocus maxlength="64000">
+    <button class="btn btn-primary">Send</button>
+  </form>
+  <div class="text-secondary small mt-2">Messages pass through Orbit's relay unsealed for now and are deleted when the session ends. The host's machine runs the model and sees this conversation.</div>
+</div></div>
+<script>
+(function () {
+  var sid = {{ s.id }}, after = 0, seen = {}, thinking = null;
+  var log = document.getElementById('chat'), form = document.getElementById('say'), input = document.getElementById('msg');
+  function add(sender, text, extra) {
+    var d = document.createElement('div');
+    d.className = 'msg msg-' + sender + (extra ? ' ' + extra : '');
+    d.textContent = text;
+    log.appendChild(d); log.scrollTop = log.scrollHeight;
+    return d;
+  }
+  function show(m) {
+    if (seen[m.id]) return;
+    seen[m.id] = true; after = Math.max(after, m.id);
+    if (m.sender === 'host' && thinking) { thinking.remove(); thinking = null; }
+    add(m.sender, m.body);
+  }
+  function poll() {
+    fetch('/sessions/' + sid + '/messages?after=' + after + '&wait=15', {credentials: 'same-origin'})
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) {
+        d.messages.forEach(show);
+        if (d.ended) { location.reload(); return; }
+        setTimeout(poll, 100);
+      })
+      .catch(function () { setTimeout(poll, 3000); });
+  }
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    fetch('/sessions/' + sid + '/messages', {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'body=' + encodeURIComponent(text)})
+      .then(function (r) {
+        if (!r.ok) { return r.json().then(function (j) { add('system', 'Not sent: ' + (j.detail || r.status), 'text-warning'); }); }
+        return r.json().then(function (j) {
+          show({id: j.id, sender: 'user', body: text});
+          if (!thinking) thinking = add('host', 'Thinking…', 'text-secondary');
+        });
+      })
+      .catch(function () { add('system', 'Not sent: Orbit did not answer.', 'text-warning'); });
+  });
+  poll();
+})();
+</script>
 <form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
 {% endif %}
 {% endblock %}
