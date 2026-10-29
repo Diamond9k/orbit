@@ -30,6 +30,18 @@ counts the minutes, and moves the money. It never runs a model and never sees a 
    router with nothing to configure.
 3. Gets paid for every minute the machine is used. Nothing for listing it.
 
+Today the host program is one Python file that needs llama.cpp installed (the `llama` command):
+
+```
+# put the token from the Hosts page in host/token.txt, then
+ORBIT_URL=https://where-orbit-runs python3 host/orbit_host.py
+```
+
+It heartbeats, starts `llama serve` for the model a user chose, tells Orbit when it is ready
+(billing starts then), relays the conversation to the model, and stops the server when the
+session ends. Settings: `ORBIT_URL`, `ORBIT_LLAMA_CMD` (default `llama serve`), `ORBIT_LLAMA_PORT`
+(default `8081`).
+
 ## The rules Orbit is built on
 
 1. **Orbit is a broker, not a middleman.** Conversations go from user to host, encrypted end to
@@ -88,6 +100,7 @@ All optional, set as environment variables, or put `KEY=value` lines in a file n
 | `ORBIT_CUT_PERCENT` | Orbit's share of each session | `20` |
 | `ORBIT_HOST`, `ORBIT_PORT` | where the server listens | `127.0.0.1`, `8000` |
 | `ORBIT_BASE_URL` | public address, used by Stripe redirects | `http://localhost:8000` |
+| `ORBIT_HOST_TIMEOUT` | seconds without a heartbeat before a host mid-session counts as gone and the session ends | `180` |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | from the Stripe dashboard. Without them the store says "not set up yet" | unset |
 
 ## How it's built
@@ -109,8 +122,9 @@ not by making Orbit bigger.
 ## Layout
 
 ```
-orbit/app.py          pages, sessions, host API, Stripe hook
+orbit/app.py          pages, sessions, host API, chat relay, Stripe hook
 orbit/ledger.py       the only code that moves money
+host/orbit_host.py    the host program: heartbeat, run the model, relay the chat
 orbit/fit.py          does this model fit on that GPU
 orbit/auth.py         sign-in
 orbit/db.py           SQLite schema
@@ -133,17 +147,24 @@ python3 -m pytest
 - Store: hardware time by card, shown in dollars and minutes. Stripe wired, needs keys.
 - Double-entry ledger with a health check.
 - Model fit from the Hugging Face name or link, with quantization chips when the name lacks one.
-- Sessions: exclusive, charged by the minute, host paid and Orbit's cut taken on stop.
+- Sessions: exclusive, charged by the minute from the moment the host says the model is ready,
+  host paid and Orbit's cut taken when the session ends.
+- Sessions end on their own when the hardware time runs out or the host stops answering, and
+  charge only for the time that was covered and reachable.
 - Live session counter: minutes, cost so far, time left.
-- Host listing with a private token, and the heartbeat API the host program will use.
+- Host listing with a private token. Host program: heartbeat, runs the chosen model with
+  llama.cpp, says ready, relays the chat, stops the model when the session ends.
+- Chat inside the session, relayed through Orbit. Unsealed for now; the page says so. Orbit keeps
+  messages only while the session runs and deletes them when it ends.
 
 **Next, in order**
-1. **Host program.** Installs like an app on Windows, Mac and Linux. Dials out to Orbit, works
-   behind a home router. Downloads the model from Hugging Face, runs it, reports minutes.
-2. **Chat screen** inside the session, end-to-end encrypted through Orbit's relay.
+1. **Seal the chat.** Browser and host program encrypt bodies end to end; Orbit relays envelopes
+   it cannot open. Waits on one owner decision (`docs/KEYSTONE.md`).
+2. **Host program installs like an app** on Windows, Mac and Linux, with plain steps on the Hosts page.
 3. **The guide.** Reacts to session events, not timers: model loaded, first answer, idle, time
    running low. One tip per event, shown once. Never sees the chat.
-4. **Host tiers.** "Verified" for machines with enclave hardware that pass attestation,
+4. **Host payouts.** Money actually leaves Orbit to hosts, recorded in the ledger.
+5. **Host tiers.** "Verified" for machines with enclave hardware that pass attestation,
    "community" for everyone else. Labels earned by the hardware.
 
 ## How it began

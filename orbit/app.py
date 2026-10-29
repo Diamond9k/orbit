@@ -560,6 +560,9 @@ async def host_inbox(token: str = Form(...), after: int = Form(0), wait: float =
         if msgs or time.monotonic() >= deadline:
             return {"session": {"id": s["id"], "model": s["model"]}, "messages": msgs}
         await asyncio.sleep(0.5)
+        # Still connected, still alive: keep last_seen honest while the request is held, so a
+        # host that vanishes is charged for up to the moment it was last here, not 20 s early.
+        conn.execute("UPDATE hosts SET last_seen = datetime('now') WHERE token = ?", (token,))
 
 
 @app.post("/api/hosts/reply")

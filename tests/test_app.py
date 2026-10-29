@@ -296,3 +296,29 @@ def test_old_database_gets_end_reason_and_messages(tmp_path):
     assert "end_reason" in {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
     assert conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0] == 0
     conn.close()
+
+
+def test_a_held_inbox_request_counts_as_heartbeats(client, monkeypatch):
+    """While the host program holds an inbox request it is alive, so last_seen must keep moving.
+    Otherwise a host that vanishes is charged only up to the start of its last held request, and a
+    host whose request is held longer than the timeout would be declared lost while connected."""
+    import asyncio
+    import types
+    from orbit import app as app_module
+    token = _ready_session(client)
+    real_sleep = asyncio.sleep
+
+    async def sleep(seconds):
+        # between two polls the heartbeat row goes stale, as if ten minutes had passed
+        _set("UPDATE hosts SET last_seen = ? WHERE id = 1", _stamp(10))
+        await real_sleep(0)
+
+    monkeypatch.setattr(app_module, "asyncio", types.SimpleNamespace(sleep=sleep))
+    r = client.post("/api/hosts/inbox", data={"token": token, "after": 0, "wait": 0.2}).json()
+    # without the refresh the sweep inside the loop would have ended the session as host_lost
+    assert r["session"] == {"id": 1, "model": "x/Model-7B-Q4_K_M"} and r["messages"] == []
+    conn = db.connect("test_app.db")
+    last_seen = conn.execute("SELECT last_seen FROM hosts WHERE id = 1").fetchone()[0]
+    conn.close()
+    assert last_seen >= _stamp(1)
+    assert _session_row()[0][2] is None  # still running
