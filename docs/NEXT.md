@@ -6,16 +6,7 @@ Add anything else worth doing to Later, one line each. Do not reorder without Co
 ## Now
 The previous builder failed by widening scope, so keep each item to its named files, use stdlib and existing imports only, and never touch requirements.txt.
 
-1. **Do not bill before the machine is ready (stranger friction).** Files: `orbit/db.py`, `orbit/app.py`, and a new test in `tests/test_app.py`.
-   In `orbit/db.py`, add a nullable `ready_at` column to the sessions table. It must be added safely to an existing `orbit.db`.
-   In `orbit/app.py`, add a route `POST /api/hosts/ready` that reads form field `token`, the same way the `heartbeat` route does.
-   It sets `ready_at` to now on that host's running session and returns 200. It returns 404 if the token is unknown or there is no running session.
-   Wherever `app.py` counts the session's minutes for the charge, count from `ready_at` instead of the start time. While `ready_at` is null the count is zero.
-   While `ready_at` is null, the session page shows "Waiting for the machine. You are not being charged." instead of the running cost.
-   Do not edit `orbit/ledger.py`.
-   Test: start a session. Assert the charged minutes are 0 and the page shows the waiting text. Then POST `/api/hosts/ready` with the host's token, assert 200, and assert `ready_at` is set. Also assert an unknown token returns 404.
-   Why: the stranger watched a cost clock run with no chat, and a user billed for a machine that is not ready leaves and never becomes a paid session.
-2. **Heartbeat tells the host what to run.** Files: `orbit/app.py`, `tests/test_app.py`.
+1. **Heartbeat tells the host what to run.** Files: `orbit/app.py`, `tests/test_app.py`.
    Change the `POST /api/hosts/heartbeat` 200 reply to JSON. It is `{"session": null}` when the host has no running session.
    When it has one, it is `{"session": {"id": <session id>, "model": "<model name of that session>"}}`.
    Keep the existing behavior of marking the host online and the existing error replies.
@@ -34,6 +25,8 @@ The previous builder failed by widening scope, so keep each item to its named fi
 9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly.
 
 ## Later
+- Host program: once the model is loaded, POST `token` to `/api/hosts/ready`. Until it does, no
+  session is ever charged. To test by hand: `curl -X POST -d token=<token> localhost:8000/api/hosts/ready`.
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
 - Cycle 1 (review/2026-10-28-1717) went to review: GET instead of POST, tests read a real
   file, requirements.txt wiped. Branch can be deleted; item 1 stays on top.
@@ -56,3 +49,5 @@ The previous builder failed by widening scope, so keep each item to its named fi
 - Starting a second session sends you to the running one and now says why on that page.
 - Host program step 1: `host/orbit_host.py` sends the heartbeat every minute from the token in
   `host/token.txt` (gitignored). Built by Claude after the swarm escalated it.
+- Billing starts when the host says the model is ready (`/api/hosts/ready`), not when the user
+  clicks start. Stopping before that charges nothing. Existing `orbit.db` files get `ready_at` on start.
