@@ -98,5 +98,18 @@ harness reports when an agent finishes; a killed agent's usage is "unmeasured", 
 ## The first bounded test: T6, the ledger tool
 
 Spec: `tests/test_ledger.py` (seven tests), committed first on `local/ledger`. Worker: the local
-14B through aider, one build attempt, time-boxed to twenty-five minutes, prompt saved with the
-run. Result: see the ledger row for T6 and the section below once the run has ended.
+14B through one plain chat call per attempt (this session's permission classifier refuses to
+launch aider with `--yes-always`, so the director plays aider's part: spec and tests in, one
+complete file out, the director writes it and runs the tests), two attempts, twenty-five minutes
+each at most, prompt saved with the run.
+
+Result, 04:18: the first answer came in 196 s, a 72-line file that passed six of the seven
+tests; the seventh failed because the director's own test was wrong (it counted an escaped pipe
+as not a pipe), so the second attempt (236 s) returned the same file and could not help. With
+the test corrected, seven of seven pass; the file is pull request 27, unchanged from the model's
+answer. Tokens: 4,609 in, 1,344 out, about 3.4 a second, cost nothing. Verdict: accepted.
+
+Lessons, now rules: the director reads the first failure before spending the fixer attempt;
+when both attempts fail the same way, suspect the spec; a 70-line file costs about three
+minutes of generation on this card, so a task that needs more than two such files in view at
+once is not for this worker.
