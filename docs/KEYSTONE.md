@@ -92,6 +92,64 @@ Cooper's yes.
 
 Newest first. Each entry: date, what changed, evidence, what is next.
 
+### 2026-10-29 01:16 CDT (UTC-05:00) (first build run, same session as the birth)
+
+**What changed.** Four commits on `keystone/first-session`, pushed and opened as pull request
+22 (https://github.com/Diamond9k/orbit/pull/22). The branch sits on pull request 21's commit,
+so merging 22 merges 21.
+- 45abb81: the heartbeat reply names the session the host should run (Now item 1).
+- c82bde0: sessions end on their own (out of time, host lost), a lost charge is posted once,
+  the chat is relayed through Orbit, the host program relays it to llama.cpp and back.
+- 349632c: `docs/evidence/` with the end-to-end run and its script; a held inbox request
+  counts as heartbeats; README and `docs/NEXT.md` describe the state as it is.
+One commit on `keystone/swarm-guardrails` (ea49334), pushed as pull request 23
+(https://github.com/Diamond9k/orbit/pull/23): no unmerged work is deleted on a timer, cycles
+leave begin and end state, aider calls time out, PROTECTED covers this record, the scoreboard
+separates test money from hosts paid and opens the database read-only. Neither branch is
+`build/`, so nothing merged itself. Cooper reviews.
+
+**Evidence, by kind.**
+- Code-supported and unit-tested: 41 tests pass on `keystone/first-session` (14 new), 26 on
+  `keystone/swarm-guardrails` (2 new). GitHub Actions ran the same on both pushes and both
+  pull requests: four runs, all green.
+- Controlled test, Cooper's PC as both roles, a scripted user, dev test funds:
+  `docs/evidence/2026-10-29-first-session-e2e.md`. Host ready 20.7 s after start. Two answers
+  from the real model, 1.0 s each. Stop charged one minute, one cent: user -1, host +1,
+  Orbit 0. Messages deleted. Model server stopped. Then the host program was stopped
+  mid-session: Orbit ended the session as `host_lost` within the 30 s test timeout, charged
+  one cent, marked the host offline, and the returning host program found nothing to run.
+  Run once.
+- Real people: still nothing. No stranger, no real money, no payout.
+
+**Found while building.**
+- The host's `last_seen` lagged by one held inbox request (about 20 s) in the run, so a lost
+  host would be charged slightly less than its real last moment. Fixed in 349632c with a unit
+  test. Not re-run end to end.
+- The host program fails to bind if a model server is already on its port (a crash leftover).
+  In `docs/NEXT.md` Later.
+- The relay is unsealed: Orbit saw bodies in flight. The page says so. Sealing waits on
+  question 2.
+- The GitHub protection findings (question 3) are unchanged.
+
+**Outside the repo.** 2026-10-29: cport-ad, a second Claude Code session working for Cooper,
+rebuilt site-clone/own-site (localhost:5400) as a read-only operator console over `orbit.db`,
+`docs/NEXT.md` and the swarm logs; site B reduced to a one-page launcher (localhost:5500).
+Evidence: `C:\Users\cport\Downloads\arc\Agent-OS\site-clone\rea\2026-10-29\FINDINGS.md`.
+Handoff: `C:\Users\cport\Downloads\arc\Agent-OS\outputs\2026-10-29-orbit-console-handoff.md`.
+Outside the Orbit repo. Reported by cport-ad; Keystone checked that the files exist, not
+what they say. That session also runs the app from a `main-ro` worktree on port 8000 against
+the clone's `orbit.db`. Stop it before running this branch's app on that file: this branch
+migrates the schema (old code ignores the new column and table), and two servers on one file
+is one too many.
+
+**Decisions still Cooper's.** Questions 1 to 7 above, unchanged. The two that block the next
+step: the sealing cipher (question 2) and the GitHub ruleset fix (question 3). And: merge or
+decline pull requests 22 and 23.
+
+**Next meaningful step.** After review: seal the chat (Then item 5). Then a public https
+address and a host program a stranger can install. Then a real payout path. The first real
+session needs steps 5 to 7 of the birth-run path; nothing in this run reached them.
+
 ### 2026-10-29 (birth run)
 
 **State found.** 23 tests pass on main (27 with pull request 21). GitHub Actions green on
