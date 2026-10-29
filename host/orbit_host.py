@@ -216,9 +216,20 @@ class Runner:
         """One message from the user: the browser's hello, a sealed message, or plain text.
 
         Returns the plain text to answer, or None when there is nothing to answer.
+
+        A sealed session is never silently downgraded to plaintext (Cooper, 2026-10-29). Once a
+        browser has answered our key this epoch (self.sealer.ready), a plain-text body is not sent
+        to the model and not answered in plaintext; the host posts a plain notice and stays sealed.
+        A fresh user hello still re-keys. Before the first seal, plain text works as before.
         """
         env = seal.parse(m["body"]) if seal is not None else None
-        if env is None:  # plain text: an older page, or a browser that never got our key
+        if env is None:  # plain text: an older page, a browser that never got our key, or a stripped body
+            if self.sealer is not None and self.sealer.ready:
+                # We have sealed with the page this epoch. A plain body now is a downgrade (stripped
+                # in flight, or a wedged page); do not feed it to the model and do not answer it in
+                # the clear. Post a plain notice (a sealed page would not see a sealed one either).
+                self.post("This session is sealed. Reload the page to continue; plain messages are not answered.")
+                return None
             self.sealed = False
             return m["body"]
         if env["t"] == "hello":
@@ -268,6 +279,8 @@ class Runner:
         if self.transcript and self.transcript[-1]["sender"] == "user":
             try:
                 answer = self.ask(self.transcript)
+                if not isinstance(answer, str):  # model output is data; a null or odd shape must not stop the loop
+                    raise TypeError(f"the model server returned {type(answer).__name__}, not text")
             except Exception as e:  # the model server failed; say so plainly instead of going quiet
                 answer = f"The model did not answer: {e}"
             if self.say(answer):

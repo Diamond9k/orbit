@@ -166,10 +166,14 @@ def test_runner_seals_the_conversation_when_the_browser_answers():
                                            {"id": 12, "sender": "user", "body": tab2.seal("still there?")}]))
     r.relay()
     assert asked[-1][-1] == ("user", "still there?") and tab2.unseal(posted[-1]) == "Pong"
-    # plain text from an older page is answered in plain text
+    # plain text once the session is sealed is NOT downgraded: a plain notice, the model is not asked,
+    # and the session stays sealed (Cooper 2026-10-29: do not silently downgrade a protected session)
+    before = len(asked)
     inbox_q.append(dict(running, messages=[{"id": 14, "sender": "user", "body": "plain"}]))
     r.relay()
-    assert posted[-1] == "Pong" and r.sealed is False
+    assert len(asked) == before
+    assert posted[-1] == "This session is sealed. Reload the page to continue; plain messages are not answered."
+    assert r.sealed is True
 
 
 def test_runner_runs_unsealed_without_the_cryptography_package(monkeypatch):
