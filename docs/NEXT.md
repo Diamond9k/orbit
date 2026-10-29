@@ -6,7 +6,7 @@ Add anything else worth doing to Later, one line each. Do not reorder without Co
 ## Now
 The previous builder failed by widening scope, so keep each item to its named files, use stdlib and existing imports only, and never touch requirements.txt.
 
-1. **Host program, step 1: say hello (retry, smaller).** New file `host/orbit_host.py`, standard library only.
+1. **Host program, step 1: say hello (retry, smaller).** _(escalated: needs Claude or Cooper)_ New file `host/orbit_host.py`, standard library only.
    Write one function `send_heartbeat(token, url="http://localhost:8000/api/hosts/heartbeat")`.
    It builds `urllib.request.Request(url, data=urllib.parse.urlencode({"token": token}).encode(), method="POST")`
    and calls `urllib.request.urlopen` on it. On a 200 reply it prints "online" and returns True.
