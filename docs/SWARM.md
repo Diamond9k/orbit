@@ -34,6 +34,10 @@ swarm never stops, so speed matters less than getting it right.
 ```
 llama serve -hf bartowski/Qwen2.5-Coder-14B-Instruct-GGUF:Q4_K_M --port 8080 -c 16384 -np 1 -ngl 20
 ```
+Aider uses the diff edit format: the model writes only the lines it changes. With the whole
+format it had to rewrite every file it touched, and `orbit/app.py` alone is about 5k tokens,
+so input plus output passed the 16k context and the builder hit a token limit, changing nothing.
+
 `-ngl 20` puts 20 layers on the GPU and the rest on the CPU. If it runs out of GPU memory,
 lower it. Check Hugging Face for a newer 14B coding model at the time.
 
