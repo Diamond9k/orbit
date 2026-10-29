@@ -114,7 +114,7 @@ against an active Orbit.
 - Nothing here bears on the verified tier, attested enclaves, or physical attacks; those remain as
   docs/PRIVACY.md describes them.
 
-## Keystone's review (2026-10-29 04:40)
+## Keystone's review (2026-10-29 04:16)
 
 Read the diffs and this document, re-ran the suite (69 passed), and checked row 3b by hand. The
 finding is correct and it is wider than the builder said: the page-reload path (`session.html`
