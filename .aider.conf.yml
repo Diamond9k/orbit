@@ -4,7 +4,9 @@
 model: openai/local
 openai-api-base: http://127.0.0.1:8080/v1
 openai-api-key: local
-edit-format: whole
+# diff: the model writes only the changed lines. whole made it rewrite all of app.py,
+# which overflowed the 16k context once app.py passed about 5k tokens.
+edit-format: diff
 auto-commits: true
 auto-test: true
 test-cmd: python -m pytest -q

@@ -56,3 +56,5 @@ The previous builder failed by widening scope, so keep each item to its named fi
   clicks start. Stopping before that charges nothing. Existing `orbit.db` files get `ready_at` on start.
 - Swarm escalations merge themselves (a `build/` branch), so the builder stops repeating an
   item main never learned was stuck. The critic's reasons now show in the swarm window.
+- Swarm builder uses Aider's diff edit format, so editing `orbit/app.py` fits the local model's
+  16k context. The whole format overflowed it and the builder changed nothing.
