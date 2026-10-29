@@ -146,6 +146,11 @@ python3 -m pytest
 4. **Host tiers.** "Verified" for machines with enclave hardware that pass attestation,
    "community" for everyone else. Labels earned by the hardware.
 
+## How it began
+
+`docs/BIRTH.md` is the record of the day Orbit was conceived, what was kept and cut, and where
+each rule in `CLAUDE.md` came from.
+
 ## The swarm
 
 Five agent roles build Orbit toward the goal in `CLAUDE.md`, on your own PC: scoreboard, stranger, director, builder, critic. See `docs/SWARM.md`.

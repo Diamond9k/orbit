@@ -28,8 +28,8 @@ The previous builder failed by widening scope, so keep each item to its named fi
 - Host program: once the model is loaded, POST `token` to `/api/hosts/ready`. Until it does, no
   session is ever charged. To test by hand: `curl -X POST -d token=<token> localhost:8000/api/hosts/ready`.
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
-- Cycle 1 (review/2026-10-28-1717) went to review: GET instead of POST, tests read a real
-  file, requirements.txt wiped. Branch can be deleted; item 1 stays on top.
+- Branches review/2026-10-28-1717, -1735, -1856, -1923 and escalate/2026-10-28-1856 are
+  swarm attempts at the host program, now merged by hand. Cooper can delete them.
 - Edit a listed machine's price without removing it.
 - Direct browser-to-host link with the relay as fallback, for speed.
 - Model fit read from the Hugging Face file list, not only the name.
@@ -51,3 +51,5 @@ The previous builder failed by widening scope, so keep each item to its named fi
   `host/token.txt` (gitignored). Built by Claude after the swarm escalated it.
 - Billing starts when the host says the model is ready (`/api/hosts/ready`), not when the user
   clicks start. Stopping before that charges nothing. Existing `orbit.db` files get `ready_at` on start.
+- Swarm escalations merge themselves (a `build/` branch), so the builder stops repeating an
+  item main never learned was stuck. The critic's reasons now show in the swarm window.

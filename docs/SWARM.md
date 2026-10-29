@@ -16,12 +16,14 @@ local agents cannot finish is escalated to Cooper or a Claude session.
 | Guard | none | Protected files send the branch to review no matter what |
 
 `swarm/run.sh` is one cycle. `swarm/forever.sh` runs cycles without end. After two failed
-cycles on one item it is marked escalated in `docs/NEXT.md`, described in
-`workspace/ESCALATE.md`, and the local agents move on. Paste that file into a Claude session
-to get it unstuck.
+cycles on one item it is marked escalated in `docs/NEXT.md` and described in
+`workspace/ESCALATE.md`. The mark is pushed as a `build/` branch so it merges itself. On the
+next cycle the director replans the item smaller. Paste `workspace/ESCALATE.md` or the run
+file into a Claude session to get it unstuck by hand.
 
 Without `ANTHROPIC_API_KEY` set, everything runs local: the director never runs, so the
-swarm works through the existing Now list and then idles until someone fills it.
+swarm works through the existing Now list and then checks every ten minutes until someone
+fills it.
 
 ## The local model
 
@@ -97,8 +99,8 @@ Open the newest file in `workspace/runs/`. Three outcomes:
 
 - **Merged itself.** Nothing to do. Glance at the diff on GitHub if you like. Revert if it
   smells wrong.
-- **Went to review/.** The critic's list is in the run file. Paste it into the top of
-  `docs/NEXT.md` as the next item. The next cycle fixes it.
+- **Went to review/.** The critic's list is in the swarm window and in the run file. Paste
+  it into the top of `docs/NEXT.md` as the next item. The next cycle fixes it.
 - **Builder got stuck or wandered.** The item was too vague. Rewrite it in `docs/NEXT.md` in
   smaller, plainer words. That is the fix, not a bigger model.
 

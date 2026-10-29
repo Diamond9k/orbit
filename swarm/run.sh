@@ -11,8 +11,8 @@
 #                      the host program, a Claude critic gets the final say (if a key is set).
 #   guard              protected files send the branch to review/ no matter what
 #
-# After two failed cycles on the same item it is marked escalated in docs/NEXT.md and
-# described in workspace/ESCALATE.md, and local agents move on.
+# After two failed cycles on the same item it is marked escalated in docs/NEXT.md (pushed as
+# a build/ branch so the mark merges itself) and described in workspace/ESCALATE.md.
 #
 #   swarm/run.sh                 one cycle from main
 #   swarm/forever.sh             cycles without end
@@ -84,12 +84,14 @@ fi
 
 echo -e "\n## Critic (local)\n" >> "$RUN"
 CRITIC_OUT="$(aider --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
+echo "$CRITIC_OUT"
 if echo "$CRITIC_OUT" | grep -qi "nothing found"; then CRITIC=clean; else CRITIC=flagged; fi
 
 if [ "$CRITIC" = clean ] && [ "$TESTS" = pass ] && [ "$GUARD" = ok ] && [ -n "${ANTHROPIC_API_KEY:-}" ] \
    && git diff --name-only "origin/$BASE"..HEAD | grep -Eq "$SENSITIVE"; then
   echo -e "\n## Critic, final say ($CRITIC_MODEL): the change touches money, sessions or the host program\n" >> "$RUN"
   CRITIC_OUT="$(aider --model "$CRITIC_MODEL" --chat-mode ask --no-auto-commits --message-file prompts/critic.md --no-show-model-warnings 2>&1 | tee -a "$RUN")"
+  echo "$CRITIC_OUT"
   if echo "$CRITIC_OUT" | grep -qi "nothing found"; then CRITIC=clean; else CRITIC=flagged; fi
 fi
 
@@ -108,10 +110,14 @@ else
 fi
 
 if [ "${FAILS:-0}" -ge 2 ]; then
-  git checkout -q -B "escalate/$STAMP" "origin/$BASE"
-  "$PY" swarm/state.py escalate "Failed $FAILS cycles locally. Last: tests=$TESTS critic=$CRITIC guard=$GUARD. Branch: $BRANCH." | tee -a "$RUN"
-  git add docs/NEXT.md && git commit -q -m "swarm: escalate '$ITEM'" && git push -q -u origin "escalate/$STAMP" \
-    && echo "Escalation pushed as escalate/$STAMP. Details in workspace/ESCALATE.md." | tee -a "$RUN"
+  # The mark goes on a build/ branch so it merges itself. Next cycle the director replans
+  # the item smaller, or the swarm waits for someone to fill Now.
+  ESCALATE="build/$STAMP-escalate"
+  WHY="Failed $FAILS cycles locally. Last: tests=$TESTS critic=$CRITIC guard=$GUARD. Branch: $BRANCH."
+  git checkout -q -B "$ESCALATE" "origin/$BASE"
+  "$PY" swarm/state.py escalate "$WHY" | tee -a "$RUN"
+  git add docs/NEXT.md && git commit -q -m "Escalate: $ITEM" -m "$WHY" && git push -q -u origin "$ESCALATE" \
+    && echo "Escalation pushed as $ESCALATE. It merges itself. Details in workspace/ESCALATE.md." | tee -a "$RUN"
 fi
 
 { echo -e "\n## Result"; echo "Item: $ITEM"; echo "Tests: $TESTS"; echo "Critic: $CRITIC"; echo "Guard: $GUARD"; echo "Fails on this item: ${FAILS:-0}"; echo "Branch: $BRANCH"; } >> "$RUN"
