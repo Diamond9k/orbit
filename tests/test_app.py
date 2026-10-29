@@ -30,7 +30,7 @@ def test_full_loop(client):
     assert r.status_code == 200
     import re
     token = re.search(r"<pre[^>]*>(.*?)</pre>", r.text, re.S).group(1).strip()
-    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"ok": True}
+    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"session": None}
     # no money yet: can't start. Friendly redirect back with a message, not an error code.
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
     assert r.status_code == 303 and "orbit_flash" in r.headers.get("set-cookie", "")
@@ -97,6 +97,16 @@ def _start_session(client):
     return token
 
 
+def test_heartbeat_names_the_session_to_run(client):
+    token = _start_session(client)
+    # the host program learns the session id and the exact model name from the heartbeat
+    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {
+        "session": {"id": 1, "model": "x/Model-7B-Q4_K_M"}}
+    assert client.post("/api/hosts/heartbeat", data={"token": "nope"}).status_code == 401
+    client.post("/sessions/1/stop", follow_redirects=False)
+    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"session": None}
+
+
 def test_no_charge_before_machine_is_ready(client):
     token = _start_session(client)
     assert "Waiting for the machine. You are not being charged." in client.get("/sessions/1").text
@@ -135,3 +145,180 @@ def test_old_database_gets_ready_at(tmp_path):
     assert "ready_at" in {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
     assert conn.execute("SELECT count(*) FROM sessions").fetchone()[0] == 1
     conn.close()
+
+
+def _stamp(minutes_ago):
+    from datetime import datetime, timedelta, timezone
+    return (datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _ready_session(client):
+    """A running, ready session: $10.00 of time on a $0.60/h machine, so 1000 minutes are covered."""
+    token = _start_session(client)
+    assert client.post("/api/hosts/ready", data={"token": token}).status_code == 200
+    return token
+
+
+def _session_row(sid=1):
+    conn = db.connect("test_app.db")
+    s = conn.execute("SELECT minutes, cost_cents, end_reason FROM sessions WHERE id = ?", (sid,)).fetchone()
+    host = conn.execute("SELECT status FROM hosts WHERE id = 1").fetchone()["status"]
+    conn.close()
+    return (s["minutes"], s["cost_cents"], s["end_reason"]), host
+
+
+def _set(sql, *args):
+    conn = db.connect("test_app.db")
+    conn.execute(sql, args)
+    conn.close()
+
+
+def test_session_ends_on_its_own_when_time_runs_out(client):
+    token = _ready_session(client)
+    _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(1200))  # ran 20 hours, had 1000 minutes
+    page = client.get("/sessions/1").text
+    assert ">ended<" in page and "Your hardware time ran out" in page
+    assert _session_row() == ((1000, 1000, "out_of_time"), "online")
+    assert "$0.00" in client.get("/account").text  # charged exactly what was there, never below zero
+    assert client.get("/health").json()["ok"] is True
+    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"session": None}
+
+
+def test_stopping_late_charges_only_the_time_that_was_covered(client):
+    _ready_session(client)
+    _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(1500))
+    client.post("/sessions/1/stop", follow_redirects=False)
+    assert _session_row() == ((1000, 1000, "out_of_time"), "online")
+
+
+def test_session_ends_when_the_host_stops_answering(client):
+    _ready_session(client)
+    _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(12))
+    _set("UPDATE hosts SET last_seen = ? WHERE id = 1", _stamp(10))  # silent for 10 minutes
+    page = client.get("/sessions/1").text
+    assert ">ended<" in page and "The machine stopped answering" in page
+    # charged from ready to the last heartbeat: 2 minutes at $0.60/h is 2 cents, not the 12 minutes since ready
+    assert _session_row() == ((2, 2, "host_lost"), "offline")
+    assert "$9.98" in client.get("/account").text
+
+
+def test_lost_host_before_ready_costs_nothing(client):
+    _start_session(client)
+    _set("UPDATE hosts SET last_seen = ? WHERE id = 1", _stamp(10))
+    assert ">ended<" in client.get("/sessions/1").text
+    assert _session_row() == ((0, 0, "host_lost"), "offline")
+    assert "$10.00" in client.get("/account").text
+
+
+def test_a_lost_charge_is_posted_once(client):
+    _ready_session(client)
+    client.post("/sessions/1/stop", follow_redirects=False)
+    conn = db.connect("test_app.db")
+    assert conn.execute("SELECT COUNT(*) FROM ledger WHERE memo = 'session:1'").fetchone()[0] == 3
+    conn.close()
+    # pretend the process died between closing the session and posting the charge, two minutes ago
+    _set("DELETE FROM ledger WHERE memo = 'session:1'")
+    _set("UPDATE sessions SET ended_at = ? WHERE id = 1", _stamp(2))
+    client.get("/account")  # any sweep repairs it
+    client.get("/account")  # and a second sweep does not bill twice
+    conn = db.connect("test_app.db")
+    rows = conn.execute("SELECT account, amount_cents FROM ledger WHERE memo = 'session:1' ORDER BY id").fetchall()
+    conn.close()
+    assert [(r["account"], r["amount_cents"]) for r in rows] == [("user:1", -1), ("host:1", 1), ("orbit:revenue", 0)]
+    assert client.get("/health").json()["ok"] is True
+
+
+def test_affordable_minutes_rounds_like_the_bill():
+    import math
+    from orbit.app import affordable_minutes
+    assert affordable_minutes(1000, 60) == 1000
+    assert affordable_minutes(60, 60) == 60
+    assert affordable_minutes(0, 60) == 0 and affordable_minutes(100, 0) == 0
+    for balance, price in [(1000, 70), (999, 60), (1, 60), (5, 7), (250, 33)]:
+        m = affordable_minutes(balance, price)
+        assert math.ceil(price * m / 60) <= balance < math.ceil(price * (m + 1) / 60)
+
+
+def test_chat_is_relayed_and_dropped_with_the_session(client):
+    token = _start_session(client)
+    # the machine is still loading: nothing can be sent yet
+    assert client.post("/sessions/1/messages", data={"body": "hi"}).status_code == 409
+    assert client.post("/api/hosts/ready", data={"token": token}).status_code == 200
+    r = client.post("/api/hosts/inbox", data={"token": token, "after": 0, "wait": 0}).json()
+    assert r == {"session": {"id": 1, "model": "x/Model-7B-Q4_K_M"}, "messages": []}
+    assert client.post("/sessions/1/messages", data={"body": "   "}).status_code == 400
+    assert client.post("/sessions/1/messages", data={"body": "  hello there  "}).json() == {"id": 1}
+    r = client.post("/api/hosts/inbox", data={"token": token, "after": 0, "wait": 0}).json()
+    assert [(m["sender"], m["body"]) for m in r["messages"]] == [("user", "hello there")]
+    assert client.post("/api/hosts/reply", data={"token": "nope", "session_id": 1, "body": "x"}).status_code == 404
+    assert client.post("/api/hosts/reply", data={"token": token, "session_id": 1, "body": "Hi!"}).json() == {"id": 2}
+    r = client.get("/sessions/1/messages?after=0&wait=0").json()
+    assert [(m["sender"], m["body"]) for m in r["messages"]] == [("user", "hello there"), ("host", "Hi!")]
+    assert r["ended"] is False and r["ready"] is True
+    assert [m["id"] for m in client.get("/sessions/1/messages?after=1&wait=0").json()["messages"]] == [2]
+    # the host program fetches only what it has not seen
+    assert client.post("/api/hosts/inbox", data={"token": token, "after": 2, "wait": 0}).json()["messages"] == []
+    # holding for news returns after the wait when nothing arrives
+    import time
+    t0 = time.monotonic()
+    assert client.get("/sessions/1/messages?after=2&wait=0.6").json()["messages"] == []
+    assert time.monotonic() - t0 >= 0.5
+    # the session page shows the chat, honestly labelled
+    page = client.get("/sessions/1").text
+    assert 'id="chat"' in page and "unsealed for now" in page
+    # someone else cannot read it
+    with TestClient(app) as other:
+        other.post("/signup", data={"email": "o@b.co", "password": "longenough"}, follow_redirects=False)
+        assert other.get("/sessions/1/messages?after=0&wait=0").status_code == 404
+        assert other.post("/sessions/1/messages", data={"body": "hi"}).status_code == 409
+    # stop: the conversation is gone, the host learns the session is over
+    client.post("/sessions/1/stop", follow_redirects=False)
+    assert client.post("/sessions/1/messages", data={"body": "hi"}).status_code == 409
+    r = client.get("/sessions/1/messages?after=0&wait=0").json()
+    assert r["ended"] is True and r["end_reason"] == "stopped" and r["messages"] == []
+    assert client.post("/api/hosts/inbox", data={"token": token, "after": 0, "wait": 0}).json() == {"session": None, "messages": []}
+    conn = db.connect("test_app.db")
+    assert conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0] == 0
+    conn.close()
+    assert "You stopped it" in client.get("/sessions/1").text
+
+
+def test_old_database_gets_end_reason_and_messages(tmp_path):
+    import sqlite3
+    path = str(tmp_path / "old.db")
+    old = sqlite3.connect(path)
+    old.execute("CREATE TABLE sessions (id INTEGER PRIMARY KEY, user_id INTEGER, host_id INTEGER, model TEXT, "
+                "started_at TEXT, ended_at TEXT, minutes INTEGER, cost_cents INTEGER, ready_at TEXT)")
+    old.commit()
+    old.close()
+    db.init(path)
+    conn = db.connect(path)
+    assert "end_reason" in {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
+    assert conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0] == 0
+    conn.close()
+
+
+def test_a_held_inbox_request_counts_as_heartbeats(client, monkeypatch):
+    """While the host program holds an inbox request it is alive, so last_seen must keep moving.
+    Otherwise a host that vanishes is charged only up to the start of its last held request, and a
+    host whose request is held longer than the timeout would be declared lost while connected."""
+    import asyncio
+    import types
+    from orbit import app as app_module
+    token = _ready_session(client)
+    real_sleep = asyncio.sleep
+
+    async def sleep(seconds):
+        # between two polls the heartbeat row goes stale, as if ten minutes had passed
+        _set("UPDATE hosts SET last_seen = ? WHERE id = 1", _stamp(10))
+        await real_sleep(0)
+
+    monkeypatch.setattr(app_module, "asyncio", types.SimpleNamespace(sleep=sleep))
+    r = client.post("/api/hosts/inbox", data={"token": token, "after": 0, "wait": 0.2}).json()
+    # without the refresh the sweep inside the loop would have ended the session as host_lost
+    assert r["session"] == {"id": 1, "model": "x/Model-7B-Q4_K_M"} and r["messages"] == []
+    conn = db.connect("test_app.db")
+    last_seen = conn.execute("SELECT last_seen FROM hosts WHERE id = 1").fetchone()[0]
+    conn.close()
+    assert last_seen >= _stamp(1)
+    assert _session_row()[0][2] is None  # still running

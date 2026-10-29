@@ -6,16 +6,12 @@ Add anything else worth doing to Later, one line each. Do not reorder without Co
 ## Now
 The previous builder failed by widening scope, so keep each item to its named files, use stdlib and existing imports only, and never touch requirements.txt.
 
-1. **Heartbeat tells the host what to run.** Files: `orbit/app.py`, `tests/test_app.py`.
-   Change the `POST /api/hosts/heartbeat` 200 reply to JSON. It is `{"session": null}` when the host has no running session.
-   When it has one, it is `{"session": {"id": <session id>, "model": "<model name of that session>"}}`.
-   Keep the existing behavior of marking the host online and the existing error replies.
-   Test: a heartbeat with no session returns `{"session": null}`. After starting a session on that host, a heartbeat returns the session id and the exact model name.
-   Why: the host program can only load the model a stranger chose if Orbit tells it on the heartbeat
 
 ## Then
-5. **Chat screen** inside the session page. Encrypted end to end between the browser and the
-   host program. Orbit relays sealed envelopes it cannot open. Streams tokens.
+5. **Seal the chat.** The relay exists and the chat works, unsealed. Make the browser and the
+   host program encrypt message bodies end to end so Orbit relays sealed envelopes it cannot
+   open; Orbit's own code does not change. Needs Cooper's decision on the host program's cipher
+   library (docs/KEYSTONE.md, question 2). Then stream tokens.
 6. **The guide.** Reacts to session events, not timers: model loaded, first answer sent, user
    idle, time running low, session ended. One tip per event, shown once. Answers questions
    from session data. Never sees the chat.
@@ -35,6 +31,17 @@ The previous builder failed by widening scope, so keep each item to its named fi
 - Direct browser-to-host link with the relay as fallback, for speed.
 - Model fit read from the Hugging Face file list, not only the name.
 - A real domain and a small rented box for Orbit once strangers are paying strangers.
+- Host program: if a model server is already answering on its port when it starts (left over
+  from a crash), adopt or stop it instead of failing to bind forever.
+- Host program installs like an app (one file, no Python or llama.cpp to set up), and the
+  Hosts page gives the plain steps and a download link (the stranger's number two complaint).
+- Hosts page: plain steps to run the host program today (token file, `python host/orbit_host.py`,
+  `ORBIT_URL`), until it installs like an app.
+- Sessions end themselves on every request today; add a timer sweep in the app only if that
+  proves too late in practice.
+- Stream tokens through the relay: the host posts partial replies, the page appends them.
+- The session page shows the conversation only while it runs; afterwards it says Orbit kept
+  nothing. Let the user download their own transcript before stopping, from the browser.
 
 ## Done
 - v0.1 web app: sign-in, hardware-time store, double-entry ledger, model fit from the name,
@@ -59,3 +66,14 @@ The previous builder failed by widening scope, so keep each item to its named fi
 - Host program runs the model: when the heartbeat names a session it starts `llama serve -hf`
   on port 8081, posts `/api/hosts/ready` once it answers, and stops it when the session ends.
   It reads the session from the heartbeat reply, so it waits on Now item 1 to do anything.
+- Heartbeat reply names the session the host should run: `{"session": {"id", "model"}}` or
+  `{"session": null}`. Built by Keystone after the local builder overflowed its context on it twice.
+- Sessions end on their own: when the hardware time runs out (charged exactly the minutes the
+  balance covered, never below zero) or when the host has not been heard from for three minutes
+  (charged only up to its last heartbeat). Stopping late charges only the covered time. The ended
+  page says why. A charge lost to a crash between closing the session and posting it is posted by
+  the next sweep, once; a retry never bills twice.
+- The chat is relayed. The user's words reach the model on the host and the answer comes back:
+  browser to `/sessions/{id}/messages`, host program long-polls `/api/hosts/inbox`, asks llama.cpp,
+  posts `/api/hosts/reply`. Orbit keeps bodies only while the session runs, never reads them,
+  deletes them when it ends. Unsealed for now, and the page says so. Built by Keystone.

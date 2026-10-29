@@ -50,14 +50,29 @@ CREATE TABLE IF NOT EXISTS sessions (
     ended_at    TEXT,
     minutes     INTEGER,
     cost_cents  INTEGER,
-    ready_at    TEXT  -- when the host said the model is loaded; billing starts here
+    ready_at    TEXT,  -- when the host said the model is loaded; billing starts here
+    end_reason  TEXT   -- stopped | out_of_time | host_lost
 );
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+
+-- The conversation in flight between a browser and a host program. Orbit relays bodies
+-- without reading them and deletes a session's messages when the session ends.
+CREATE TABLE IF NOT EXISTS messages (
+    id          INTEGER PRIMARY KEY,
+    session_id  INTEGER NOT NULL REFERENCES sessions(id),
+    sender      TEXT NOT NULL,     -- user | host
+    body        TEXT NOT NULL,     -- opaque to Orbit
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS messages_session ON messages(session_id, id);
 """
 
 
 def connect(path: str | None = None) -> sqlite3.Connection:
-    conn = sqlite3.connect(path or DB_PATH, isolation_level=None)
+    # One connection per request, used by one request at a time. The request's dependency and
+    # its handler may run on different threads (a sync dependency feeding an async handler), so
+    # SQLite's same-thread check is turned off; nothing shares a connection across requests.
+    conn = sqlite3.connect(path or DB_PATH, isolation_level=None, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
@@ -78,6 +93,8 @@ def migrate(conn: sqlite3.Connection) -> None:
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
     if "ready_at" not in cols:
         conn.execute("ALTER TABLE sessions ADD COLUMN ready_at TEXT")
+    if "end_reason" not in cols:
+        conn.execute("ALTER TABLE sessions ADD COLUMN end_reason TEXT")
 
 
 @contextmanager

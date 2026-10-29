@@ -23,7 +23,11 @@ h1, h2, h3, .display-5, .display-4 { letter-spacing: -.02em; }
 .step-num { width: 2rem; height: 2rem; display: inline-grid; place-items: center; border-radius: 50%; background: var(--bs-primary); color: #071024; font-weight: 800; font-size: .9rem; }
 .stat-n { font-size: 2.2rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
 .price-n { font-size: 1.6rem; font-weight: 800; }
-.chat-placeholder { min-height: 280px; border: 1px dashed var(--bs-border-color); border-radius: .75rem; display: grid; place-items: center; text-align: center; color: var(--bs-secondary-color); padding: 2rem; }
+.chat-log { min-height: 280px; max-height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; padding: .25rem; }
+.msg { padding: .6rem .9rem; border-radius: .75rem; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg-user { align-self: flex-end; background: var(--bs-primary); color: #fff; }
+.msg-host { align-self: flex-start; background: var(--bs-tertiary-bg); }
+.msg-system { align-self: center; font-size: .9rem; }
 .kicker { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--bs-primary); }
 .card.pad { padding: .5rem; }
 footer { border-top: 1px solid var(--bs-border-color); }

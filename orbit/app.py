@@ -1,10 +1,12 @@
 """Orbit web app. FastAPI, SQLite, plain HTML pages."""
+import asyncio
 import math
 import os
 import re
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from contextlib import asynccontextmanager
@@ -22,6 +24,9 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 BASE_URL = os.environ.get("ORBIT_BASE_URL", "http://localhost:8000")
 STORE_AMOUNTS_CENTS = [500, 1000, 2500]  # what the store offers, in dollars of hardware time
+HOST_TIMEOUT_SECONDS = int(os.environ.get("ORBIT_HOST_TIMEOUT", "180"))  # unseen this long mid-session: the host is gone
+MESSAGE_MAX_CHARS = 64000  # one chat message, either direction
+LONGPOLL_MAX_SECONDS = 25  # how long a messages request may wait for something new
 
 HERE = Path(__file__).parent
 
@@ -147,6 +152,7 @@ def logout():
 
 @app.get("/account", response_class=HTMLResponse)
 def account(request: Request, user=Depends(require_user), conn=Depends(get_db)):
+    sweep(conn)
     acct = f"user:{user['id']}"
     sessions = conn.execute(
         "SELECT s.*, h.name AS host_name FROM sessions s JOIN hosts h ON h.id = s.host_id "
@@ -276,6 +282,7 @@ def start_session(model: str = Form(...), host_id: int = Form(...), user=Depends
 
 @app.get("/sessions/{sid}", response_class=HTMLResponse)
 def session_page(request: Request, sid: int, user=Depends(require_user), conn=Depends(get_db)):
+    sweep(conn)
     s = conn.execute(
         "SELECT s.*, h.name AS host_name, h.gpu, h.vram_gb, h.price_cents_per_hour "
         "FROM sessions s JOIN hosts h ON h.id = s.host_id WHERE s.id = ? AND s.user_id = ?",
@@ -284,47 +291,175 @@ def session_page(request: Request, sid: int, user=Depends(require_user), conn=De
     if s is None:
         raise HTTPException(404)
     balance = ledger.balance(conn, f"user:{user['id']}")
-    minutes_left = balance * 60 // s["price_cents_per_hour"] if s["price_cents_per_hour"] else 0
-    ready_epoch = (int(datetime.fromisoformat(s["ready_at"]).replace(tzinfo=timezone.utc).timestamp())
-                   if s["ready_at"] else None)
+    minutes_left = affordable_minutes(balance, s["price_cents_per_hour"])
+    ready_epoch = int(_utc(s["ready_at"]).timestamp()) if s["ready_at"] else None
     resp = render(request, "session.html", user=user, _conn=conn, s=s, balance=balance,
                   minutes_left=minutes_left, ready_epoch=ready_epoch, flash=take_flash(request))
     resp.delete_cookie("orbit_flash")
     return resp
 
 
-def settle_session(conn: sqlite3.Connection, sid: int, user_id: int) -> None:
-    """End a session and move the money: user pays, host earns, Orbit takes its cut."""
+# ---------- ending sessions and moving the money ----------
+
+def _utc(stamp: str) -> datetime:
+    """A 'YYYY-MM-DD HH:MM:SS' stamp from SQLite's datetime('now') as an aware UTC time."""
+    return datetime.fromisoformat(stamp).replace(tzinfo=timezone.utc)
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def affordable_minutes(balance_cents: int, price_cents_per_hour: int) -> int:
+    """The most whole minutes a balance covers at this price, rounded the way the bill is."""
+    if price_cents_per_hour <= 0 or balance_cents <= 0:
+        return 0
+    m = balance_cents * 60 // price_cents_per_hour
+    while m > 0 and math.ceil(price_cents_per_hour * m / 60) > balance_cents:
+        m -= 1
+    return m
+
+
+def end_session(conn: sqlite3.Connection, s: sqlite3.Row, end: datetime, reason: str,
+                minutes: int | None = None, host_status: str = "online") -> bool:
+    """Close one running session as of `end` and move the money. False if it was already closed.
+
+    `s` is a sessions row joined with the host's price_cents_per_hour. Time is counted from the
+    moment the host said ready, one minute minimum; a session the host never got ready costs
+    nothing. The row is closed first, in one transaction that only one caller can win, then the
+    charge is posted. If the process dies between the two, sweep() posts the missing charge.
+    """
+    if s["ready_at"] is None:
+        minutes = cost = 0
+    else:
+        if minutes is None:
+            minutes = max(1, math.ceil((end - _utc(s["ready_at"])).total_seconds() / 60))
+        cost = math.ceil(s["price_cents_per_hour"] * minutes / 60)
     with db.tx(conn):
-        s = conn.execute(
-            "SELECT s.*, h.price_cents_per_hour FROM sessions s JOIN hosts h ON h.id = s.host_id "
-            "WHERE s.id = ? AND s.user_id = ? AND s.ended_at IS NULL", (sid, user_id)
-        ).fetchone()
-        if s is None:
-            raise HTTPException(404, "no running session with that id")
-        now = datetime.now(timezone.utc)
-        if s["ready_at"] is None:
-            # The machine never got ready, so nothing is charged.
-            minutes = cost = 0
-        else:
-            ready = datetime.fromisoformat(s["ready_at"]).replace(tzinfo=timezone.utc)
-            minutes = max(1, math.ceil((now - ready).total_seconds() / 60))
-            cost = math.ceil(s["price_cents_per_hour"] * minutes / 60)
-        cut = cost * ORBIT_CUT_PERCENT // 100
-        conn.execute("UPDATE sessions SET ended_at = ?, minutes = ?, cost_cents = ? WHERE id = ?",
-                     (now.strftime("%Y-%m-%d %H:%M:%S"), minutes, cost, sid))
-        conn.execute("UPDATE hosts SET status = 'online' WHERE id = ?", (s["host_id"],))
-    if cost == 0:
-        return
-    # Separate transaction, posted by the one function allowed to move money.
-    ledger.post(conn, [(f"user:{user_id}", -cost), (f"host:{s['host_id']}", cost - cut), ("orbit:revenue", cut)],
+        cur = conn.execute(
+            "UPDATE sessions SET ended_at = ?, minutes = ?, cost_cents = ?, end_reason = ? "
+            "WHERE id = ? AND ended_at IS NULL",
+            (end.strftime("%Y-%m-%d %H:%M:%S"), minutes, cost, reason, s["id"]))
+        if cur.rowcount == 0:
+            return False
+        conn.execute("UPDATE hosts SET status = ? WHERE id = ? AND status = 'busy'", (host_status, s["host_id"]))
+        conn.execute("DELETE FROM messages WHERE session_id = ?", (s["id"],))
+    post_session_charge(conn, s["id"])
+    return True
+
+
+def post_session_charge(conn: sqlite3.Connection, sid: int) -> bool:
+    """Move the money for an ended session, once: user pays, host earns, Orbit takes its cut.
+
+    Safe to call again. A session whose rows exist (memo session:<id>) is left alone, so a
+    retry never bills twice. Returns True when rows were posted.
+    """
+    s = conn.execute("SELECT user_id, host_id, cost_cents FROM sessions WHERE id = ? AND ended_at IS NOT NULL",
+                     (sid,)).fetchone()
+    if s is None or not s["cost_cents"]:
+        return False
+    if conn.execute("SELECT 1 FROM ledger WHERE memo = ? LIMIT 1", (f"session:{sid}",)).fetchone():
+        return False
+    cost = s["cost_cents"]
+    cut = cost * ORBIT_CUT_PERCENT // 100
+    # Posted by the one function allowed to move money.
+    ledger.post(conn, [(f"user:{s['user_id']}", -cost), (f"host:{s['host_id']}", cost - cut), ("orbit:revenue", cut)],
                 memo=f"session:{sid}")
+    return True
+
+
+def sweep(conn: sqlite3.Connection) -> None:
+    """End sessions that cannot go on, and post any charge that went missing.
+
+    A session ends on its own when the hardware time runs out (charged exactly the minutes the
+    balance covered) or when the host has not been heard from for HOST_TIMEOUT_SECONDS (charged
+    only up to the last moment it was reachable). Because the end time is computed, not "now",
+    a sweep that runs late never costs the user more. Runs on every heartbeat and page load,
+    so nothing depends on a timer.
+    """
+    now = utcnow()
+    running = conn.execute(
+        "SELECT s.*, h.price_cents_per_hour, h.last_seen FROM sessions s JOIN hosts h ON h.id = s.host_id "
+        "WHERE s.ended_at IS NULL").fetchall()
+    for s in running:
+        seen = _utc(s["last_seen"]) if s["last_seen"] else _utc(s["started_at"])
+        if (now - seen).total_seconds() > HOST_TIMEOUT_SECONDS:
+            end = seen if s["ready_at"] is None else max(seen, _utc(s["ready_at"]))
+            end_session(conn, s, end, "host_lost", host_status="offline")
+            continue
+        if s["ready_at"] is not None:
+            covered = affordable_minutes(ledger.balance(conn, f"user:{s['user_id']}"), s["price_cents_per_hour"])
+            ran = (now - _utc(s["ready_at"])).total_seconds() / 60
+            if ran > covered:
+                end_session(conn, s, _utc(s["ready_at"]) + timedelta(minutes=covered), "out_of_time", minutes=covered)
+    # A charge is posted right after its session closes. One that is still missing a minute
+    # later was lost to a crash between the two steps; post it now.
+    unposted = conn.execute(
+        "SELECT s.id FROM sessions s WHERE s.ended_at IS NOT NULL AND s.cost_cents > 0 "
+        "AND s.ended_at < datetime('now', '-60 seconds') "
+        "AND NOT EXISTS (SELECT 1 FROM ledger l WHERE l.memo = 'session:' || s.id)").fetchall()
+    for r in unposted:
+        post_session_charge(conn, r["id"])
 
 
 @app.post("/sessions/{sid}/stop")
 def stop_session(sid: int, user=Depends(require_user), conn=Depends(get_db)):
-    settle_session(conn, sid, user["id"])
+    sweep(conn)  # if time already ran out, the sweep ends it at the cutoff, never later
+    s = conn.execute(
+        "SELECT s.*, h.price_cents_per_hour FROM sessions s JOIN hosts h ON h.id = s.host_id "
+        "WHERE s.id = ? AND s.user_id = ? AND s.ended_at IS NULL", (sid, user["id"])
+    ).fetchone()
+    if s is not None:
+        end_session(conn, s, utcnow(), "stopped")
+    elif not conn.execute("SELECT 1 FROM sessions WHERE id = ? AND user_id = ?", (sid, user["id"])).fetchone():
+        raise HTTPException(404, "no session with that id")
     return RedirectResponse(f"/sessions/{sid}", status_code=303)
+
+
+# ---------- the conversation: relayed, not read ----------
+# The browser and the host program exchange message bodies through Orbit. Orbit stores a body
+# only until it is delivered and the session ends, and never interprets it. Bodies are plain
+# text today; sealing them end to end is a change to the browser and the host program only.
+
+def _messages_after(conn: sqlite3.Connection, sid: int, after: int) -> list[dict]:
+    rows = conn.execute("SELECT id, sender, body, created_at FROM messages WHERE session_id = ? AND id > ? ORDER BY id",
+                        (sid, after)).fetchall()
+    return [{"id": r["id"], "sender": r["sender"], "body": r["body"], "at": r["created_at"]} for r in rows]
+
+
+@app.post("/sessions/{sid}/messages")
+def send_message(sid: int, body: str = Form(...), user=Depends(require_user), conn=Depends(get_db)):
+    sweep(conn)
+    s = conn.execute("SELECT ready_at FROM sessions WHERE id = ? AND user_id = ? AND ended_at IS NULL",
+                     (sid, user["id"])).fetchone()
+    if s is None:
+        raise HTTPException(409, "this session is over")
+    if s["ready_at"] is None:
+        raise HTTPException(409, "the machine is still loading the model")
+    body = body.strip()
+    if not body:
+        raise HTTPException(400, "empty message")
+    if len(body) > MESSAGE_MAX_CHARS:
+        raise HTTPException(413, "message too long")
+    cur = conn.execute("INSERT INTO messages (session_id, sender, body) VALUES (?, 'user', ?)", (sid, body))
+    return {"id": cur.lastrowid}
+
+
+@app.get("/sessions/{sid}/messages")
+async def read_messages(sid: int, after: int = 0, wait: float = 0, user=Depends(require_user), conn=Depends(get_db)):
+    """Messages after `after`. With wait > 0 the request is held up to that many seconds for a new one."""
+    deadline = time.monotonic() + min(max(wait, 0), LONGPOLL_MAX_SECONDS)
+    while True:
+        sweep(conn)
+        s = conn.execute("SELECT ready_at, ended_at, end_reason FROM sessions WHERE id = ? AND user_id = ?",
+                         (sid, user["id"])).fetchone()
+        if s is None:
+            raise HTTPException(404)
+        msgs = _messages_after(conn, sid, after)
+        if msgs or s["ended_at"] or time.monotonic() >= deadline:
+            return {"ready": s["ready_at"] is not None, "ended": s["ended_at"] is not None,
+                    "end_reason": s["end_reason"], "messages": msgs}
+        await asyncio.sleep(0.5)
 
 
 # ---------- hosts ----------
@@ -371,27 +506,76 @@ def remove_host(hid: int, user=Depends(require_user), conn=Depends(get_db)):
 
 @app.post("/api/hosts/heartbeat")
 def heartbeat(token: str = Form(...), conn=Depends(get_db)):
-    """The host program calls this every minute while it is ready for work."""
+    """The host program calls this every few seconds while it is ready for work.
+
+    The reply names the session this machine should be running, so the host program knows
+    which model to load: {"session": {"id": ..., "model": ...}} or {"session": null}.
+    """
     cur = conn.execute(
         "UPDATE hosts SET last_seen = datetime('now'), status = CASE WHEN status = 'busy' THEN 'busy' ELSE 'online' END "
         "WHERE token = ? AND status != 'removed'", (token,)
     )
     if cur.rowcount == 0:
         raise HTTPException(401, "unknown host token")
-    return {"ok": True}
+    sweep(conn)
+    s = _host_session(conn, token)
+    return {"session": {"id": s["id"], "model": s["model"]} if s else None}
+
+
+def _host_session(conn: sqlite3.Connection, token: str):
+    return conn.execute(
+        "SELECT s.id, s.model, s.ready_at FROM sessions s JOIN hosts h ON h.id = s.host_id "
+        "WHERE h.token = ? AND h.status != 'removed' AND s.ended_at IS NULL", (token,)
+    ).fetchone()
 
 
 @app.post("/api/hosts/ready")
 def host_ready(token: str = Form(...), conn=Depends(get_db)):
     """The host program calls this once the model is loaded. Billing starts now, not before."""
-    s = conn.execute(
-        "SELECT s.id FROM sessions s JOIN hosts h ON h.id = s.host_id "
-        "WHERE h.token = ? AND h.status != 'removed' AND s.ended_at IS NULL", (token,)
-    ).fetchone()
+    s = _host_session(conn, token)
     if s is None:
         raise HTTPException(404, "unknown host token or no running session")
     conn.execute("UPDATE sessions SET ready_at = COALESCE(ready_at, datetime('now')) WHERE id = ?", (s["id"],))
+    conn.execute("UPDATE hosts SET last_seen = datetime('now') WHERE token = ?", (token,))
     return {"ok": True}
+
+
+@app.post("/api/hosts/inbox")
+async def host_inbox(token: str = Form(...), after: int = Form(0), wait: float = Form(0), conn=Depends(get_db)):
+    """The host program asks for the conversation after message `after`, holding up to `wait` seconds.
+
+    Asking counts as proof of life, like a heartbeat. The reply also names the running session,
+    so the host learns at once when it ended and can stop the model.
+    """
+    cur = conn.execute("UPDATE hosts SET last_seen = datetime('now') WHERE token = ? AND status != 'removed'", (token,))
+    if cur.rowcount == 0:
+        raise HTTPException(401, "unknown host token")
+    deadline = time.monotonic() + min(max(wait, 0), LONGPOLL_MAX_SECONDS)
+    while True:
+        sweep(conn)
+        s = _host_session(conn, token)
+        if s is None:
+            return {"session": None, "messages": []}
+        msgs = _messages_after(conn, s["id"], after)
+        if msgs or time.monotonic() >= deadline:
+            return {"session": {"id": s["id"], "model": s["model"]}, "messages": msgs}
+        await asyncio.sleep(0.5)
+        # Still connected, still alive: keep last_seen honest while the request is held, so a
+        # host that vanishes is charged for up to the moment it was last here, not 20 s early.
+        conn.execute("UPDATE hosts SET last_seen = datetime('now') WHERE token = ?", (token,))
+
+
+@app.post("/api/hosts/reply")
+def host_reply(token: str = Form(...), session_id: int = Form(...), body: str = Form(...), conn=Depends(get_db)):
+    """The host program posts the model's answer for the running session."""
+    s = _host_session(conn, token)
+    if s is None or s["id"] != session_id:
+        raise HTTPException(404, "unknown host token or no such running session")
+    if len(body) > MESSAGE_MAX_CHARS:
+        raise HTTPException(413, "message too long")
+    cur = conn.execute("INSERT INTO messages (session_id, sender, body) VALUES (?, 'host', ?)", (session_id, body))
+    conn.execute("UPDATE hosts SET last_seen = datetime('now') WHERE token = ?", (token,))
+    return {"id": cur.lastrowid}
 
 
 @app.post("/api/hosts/offline")

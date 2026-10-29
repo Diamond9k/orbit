@@ -8,7 +8,8 @@ It only dials out, so it works behind a home router with nothing to configure.
 Every few seconds it sends a heartbeat. When Orbit's reply names a session, it starts
 llama.cpp's server for that model (which downloads the GGUF from Hugging Face the first
 time), waits until the server answers, then tells Orbit the machine is ready. Billing
-starts only then. When the session ends, it stops the server.
+starts only then. While the session runs it asks Orbit for the user's messages, puts each
+one to the model, and posts the answer back. When the session ends, it stops the server.
 
 Settings, all optional, as environment variables:
     ORBIT_URL        where Orbit runs (default http://localhost:8000)
@@ -29,17 +30,22 @@ import urllib.request
 ORBIT_URL = os.environ.get("ORBIT_URL", "http://localhost:8000").rstrip("/")
 HEARTBEAT_URL = ORBIT_URL + "/api/hosts/heartbeat"
 READY_URL = ORBIT_URL + "/api/hosts/ready"
+INBOX_URL = ORBIT_URL + "/api/hosts/inbox"
+REPLY_URL = ORBIT_URL + "/api/hosts/reply"
 LLAMA_CMD = os.environ.get("ORBIT_LLAMA_CMD", "llama serve")
 LLAMA_PORT = int(os.environ.get("ORBIT_LLAMA_PORT", "8081"))
 TOKEN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "token.txt")
-INTERVAL = 10  # seconds between heartbeats
+INTERVAL = 10  # seconds between heartbeats while no session is running
+WAIT = 20  # seconds Orbit may hold an inbox request while nothing new is said
+ANSWER_MAX_TOKENS = 1024
 
 QUANT = re.compile(r"^(I?Q\d\w*|F16|BF16|F32)$", re.I)
 
 
-def _post(url, token):
-    req = urllib.request.Request(url, data=urllib.parse.urlencode({"token": token}).encode(), method="POST")
-    return urllib.request.urlopen(req, timeout=30)
+def _post(url, token, **fields):
+    data = urllib.parse.urlencode({"token": token, **fields}).encode()
+    req = urllib.request.Request(url, data=data, method="POST")
+    return urllib.request.urlopen(req, timeout=WAIT + 30)
 
 
 def check_in(token, url=HEARTBEAT_URL):
@@ -100,14 +106,50 @@ def send_ready(token, url=READY_URL):
         return False
 
 
-class Runner:
-    """Keeps at most one model server running, for the session Orbit named."""
+def fetch_inbox(token, after, wait=WAIT, url=INBOX_URL):
+    """Ask Orbit for the conversation after message `after`. Orbit holds the request up to
+    `wait` seconds for something new. Returns the parsed reply, or None if Orbit did not answer."""
+    try:
+        with _post(url, token, after=after, wait=wait) as resp:
+            return json.loads(resp.read() or b"{}")
+    except (urllib.error.HTTPError, urllib.error.URLError, ValueError) as e:
+        print(f"error: {e}")
+        return None
 
-    def __init__(self, token, popen=subprocess.Popen, server_up=model_server_up, ready=send_ready):
+
+def send_reply(token, session_id, body, url=REPLY_URL):
+    """Post the model's answer. Returns the message id Orbit gave it, or None."""
+    try:
+        with _post(url, token, session_id=session_id, body=body) as resp:
+            return json.loads(resp.read() or b"{}").get("id")
+    except (urllib.error.HTTPError, urllib.error.URLError, ValueError) as e:
+        print(f"error: {e}")
+        return None
+
+
+def ask_model(transcript, port=LLAMA_PORT):
+    """Put the whole conversation to llama.cpp's OpenAI-style endpoint and return the answer."""
+    msgs = [{"role": "user" if m["sender"] == "user" else "assistant", "content": m["body"]} for m in transcript]
+    body = json.dumps({"messages": msgs, "max_tokens": ANSWER_MAX_TOKENS}).encode()
+    req = urllib.request.Request(f"http://127.0.0.1:{port}/v1/chat/completions", data=body,
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=600) as resp:
+        data = json.load(resp)
+    return data["choices"][0]["message"]["content"]
+
+
+class Runner:
+    """Keeps at most one model server running, for the session Orbit named, and relays its chat."""
+
+    def __init__(self, token, popen=subprocess.Popen, server_up=model_server_up, ready=send_ready,
+                 inbox=fetch_inbox, reply=send_reply, ask=ask_model):
         self.token, self.popen, self.server_up, self.ready = token, popen, server_up, ready
+        self.inbox, self.reply, self.ask = inbox, reply, ask
         self.session_id = None
         self.proc = None
         self.ready_sent = False
+        self.transcript = []  # the conversation so far, oldest first; lives only in memory
+        self.after = 0  # the newest message id seen
 
     def step(self, session):
         if session is None or session.get("id") != self.session_id:
@@ -128,6 +170,33 @@ class Runner:
             if self.ready_sent:
                 print("model ready")
 
+    def relay(self):
+        """One round of the conversation: fetch what the user said, answer it, post the answer.
+
+        Holds up to WAIT seconds while nothing is said, so it also paces the main loop.
+        If Orbit says the session is over, the model server is stopped at once.
+        """
+        got = self.inbox(self.token, self.after)
+        if got is None:
+            return
+        session = got.get("session")
+        if session is None or session.get("id") != self.session_id:
+            self.stop()
+            return
+        for m in got.get("messages", []):
+            if m["id"] > self.after:
+                self.transcript.append(m)
+                self.after = m["id"]
+        if self.transcript and self.transcript[-1]["sender"] == "user":
+            try:
+                answer = self.ask(self.transcript)
+            except Exception as e:  # the model server failed; say so plainly instead of going quiet
+                answer = f"The model did not answer: {e}"
+            mid = self.reply(self.token, self.session_id, answer)
+            if mid:
+                self.transcript.append({"id": mid, "sender": "host", "body": answer})
+                self.after = max(self.after, mid)
+
     def stop(self):
         if self.proc is not None:
             print(f"session {self.session_id} ended, stopping the model server")
@@ -137,6 +206,7 @@ class Runner:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
         self.proc, self.session_id, self.ready_sent = None, None, False
+        self.transcript, self.after = [], 0
 
 
 def main():
@@ -148,7 +218,10 @@ def main():
             ok, session = check_in(token)
             if ok:
                 runner.step(session)
-            time.sleep(INTERVAL)
+            if runner.ready_sent:
+                runner.relay()  # waits for the user, up to WAIT seconds
+            else:
+                time.sleep(INTERVAL)
     finally:
         runner.stop()
 

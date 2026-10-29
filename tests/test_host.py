@@ -88,3 +88,76 @@ def test_runner_restarts_a_crashed_server():
     assert r.proc is None
     r.step(s)
     assert len(procs) == 2
+
+
+def test_runner_relays_the_conversation():
+    replies = [
+        {"session": {"id": 1, "model": "m"}, "messages": [{"id": 1, "sender": "user", "body": "hi"}]},
+        {"session": {"id": 1, "model": "m"}, "messages": []},
+        {"session": None, "messages": []},
+    ]
+    asked, posted, inboxes = [], [], []
+    r = orbit_host.Runner("tok", popen=lambda a: FakeProc(a), server_up=lambda: True, ready=lambda t: True,
+                          inbox=lambda t, after: inboxes.append(after) or replies.pop(0),
+                          reply=lambda t, sid, body: posted.append((sid, body)) or 2,
+                          ask=lambda transcript: asked.append([m["body"] for m in transcript]) or "hello")
+    r.step({"id": 1, "model": "m"})
+    assert r.ready_sent
+    r.relay()  # a user message arrives: the model is asked with the whole transcript, the answer is posted
+    assert asked == [["hi"]] and posted == [(1, "hello")]
+    assert [m["body"] for m in r.transcript] == ["hi", "hello"] and r.after == 2
+    r.relay()  # nothing new: the model is not asked again
+    assert asked == [["hi"]] and inboxes == [0, 2]
+    r.relay()  # Orbit says the session is over: the server stops, the transcript is dropped
+    assert r.proc is None and r.transcript == [] and r.after == 0
+
+
+def _raise(exc):
+    raise exc
+
+
+def test_runner_tells_the_user_when_the_model_fails():
+    posted = []
+    r = orbit_host.Runner("tok", popen=lambda a: FakeProc(a), server_up=lambda: True, ready=lambda t: True,
+                          inbox=lambda t, after: {"session": {"id": 1, "model": "m"},
+                                                  "messages": [{"id": 1, "sender": "user", "body": "hi"}]},
+                          reply=lambda t, sid, body: posted.append(body) or 2,
+                          ask=lambda transcript: _raise(OSError("connection refused")))
+    r.step({"id": 1, "model": "m"})
+    r.relay()
+    assert posted == ["The model did not answer: connection refused"]
+
+
+def test_ask_model_sends_the_conversation_as_roles():
+    import io
+    import json
+    payload = json.dumps({"choices": [{"message": {"role": "assistant", "content": "42"}}]}).encode()
+    resp = mock.MagicMock(status=200)
+    resp.__enter__.return_value = io.BytesIO(payload)
+    with mock.patch("urllib.request.urlopen", return_value=resp) as urlopen:
+        out = orbit_host.ask_model([{"id": 1, "sender": "user", "body": "q"}, {"id": 2, "sender": "host", "body": "a"},
+                                    {"id": 3, "sender": "user", "body": "q2"}], port=9000)
+    assert out == "42"
+    req = urlopen.call_args[0][0]
+    assert req.full_url == "http://127.0.0.1:9000/v1/chat/completions"
+    sent = json.loads(req.data)
+    assert [(m["role"], m["content"]) for m in sent["messages"]] == [("user", "q"), ("assistant", "a"), ("user", "q2")]
+
+
+def test_inbox_and_reply_post_the_token_and_fields():
+    resp = mock.MagicMock(status=200)
+    resp.__enter__.return_value = resp
+    resp.read.return_value = b'{"session": {"id": 1, "model": "m"}, "messages": []}'
+    with mock.patch("urllib.request.urlopen", return_value=resp) as urlopen:
+        assert orbit_host.fetch_inbox("abc", 5, wait=3) == {"session": {"id": 1, "model": "m"}, "messages": []}
+    req = urlopen.call_args[0][0]
+    assert req.full_url == "http://localhost:8000/api/hosts/inbox"
+    assert b"token=abc" in req.data and b"after=5" in req.data and b"wait=3" in req.data
+    resp.read.return_value = b'{"id": 9}'
+    with mock.patch("urllib.request.urlopen", return_value=resp) as urlopen:
+        assert orbit_host.send_reply("abc", 1, "hello there") == 9
+    req = urlopen.call_args[0][0]
+    assert req.full_url == "http://localhost:8000/api/hosts/reply"
+    assert b"session_id=1" in req.data and b"body=hello+there" in req.data
+    with mock.patch("urllib.request.urlopen", side_effect=urllib.error.URLError("down")):
+        assert orbit_host.fetch_inbox("abc", 0) is None and orbit_host.send_reply("abc", 1, "x") is None
