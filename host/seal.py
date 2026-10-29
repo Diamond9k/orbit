@@ -59,7 +59,7 @@ def parse(body):
         return None
     try:
         env = json.loads(body)
-    except ValueError:
+    except (ValueError, RecursionError):  # not JSON, or nested too deep to be anything but hostile
         return None
     if not isinstance(env, dict) or env.get("v") != VERSION or env.get("t") not in ("hello", "msg"):
         return None
@@ -140,8 +140,10 @@ class Sealer:
         if env is None or env.get("t") != "msg" or env.get("from") != self.peer:
             raise SealError("not a sealed message from the other end")
         n = env.get("n")
-        if not isinstance(n, int) or n != self.received + 1:
-            raise SealError(f"message {n} out of order, expected {self.received + 1}")
+        if not isinstance(n, int) or isinstance(n, bool) or n != self.received + 1:
+            # The field is untrusted text; it is not echoed, so the error always prints on any console.
+            shown = n if isinstance(n, int) and not isinstance(n, bool) else "(not a number)"
+            raise SealError(f"message {shown} out of order, expected {self.received + 1}")
         try:
             text = AESGCM(self._recv_key).decrypt(n.to_bytes(12, "big"), _b64d(env.get("ct", "")),
                                                   self._aad(self.peer, n))
