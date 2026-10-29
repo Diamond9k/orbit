@@ -285,9 +285,10 @@ def session_page(request: Request, sid: int, user=Depends(require_user), conn=De
         raise HTTPException(404)
     balance = ledger.balance(conn, f"user:{user['id']}")
     minutes_left = balance * 60 // s["price_cents_per_hour"] if s["price_cents_per_hour"] else 0
-    started_epoch = int(datetime.fromisoformat(s["started_at"]).replace(tzinfo=timezone.utc).timestamp())
+    ready_epoch = (int(datetime.fromisoformat(s["ready_at"]).replace(tzinfo=timezone.utc).timestamp())
+                   if s["ready_at"] else None)
     resp = render(request, "session.html", user=user, _conn=conn, s=s, balance=balance,
-                  minutes_left=minutes_left, started_epoch=started_epoch, flash=take_flash(request))
+                  minutes_left=minutes_left, ready_epoch=ready_epoch, flash=take_flash(request))
     resp.delete_cookie("orbit_flash")
     return resp
 
@@ -301,14 +302,20 @@ def settle_session(conn: sqlite3.Connection, sid: int, user_id: int) -> None:
         ).fetchone()
         if s is None:
             raise HTTPException(404, "no running session with that id")
-        started = datetime.fromisoformat(s["started_at"]).replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
-        minutes = max(1, math.ceil((now - started).total_seconds() / 60))
-        cost = math.ceil(s["price_cents_per_hour"] * minutes / 60)
+        if s["ready_at"] is None:
+            # The machine never got ready, so nothing is charged.
+            minutes = cost = 0
+        else:
+            ready = datetime.fromisoformat(s["ready_at"]).replace(tzinfo=timezone.utc)
+            minutes = max(1, math.ceil((now - ready).total_seconds() / 60))
+            cost = math.ceil(s["price_cents_per_hour"] * minutes / 60)
         cut = cost * ORBIT_CUT_PERCENT // 100
         conn.execute("UPDATE sessions SET ended_at = ?, minutes = ?, cost_cents = ? WHERE id = ?",
                      (now.strftime("%Y-%m-%d %H:%M:%S"), minutes, cost, sid))
         conn.execute("UPDATE hosts SET status = 'online' WHERE id = ?", (s["host_id"],))
+    if cost == 0:
+        return
     # Separate transaction, posted by the one function allowed to move money.
     ledger.post(conn, [(f"user:{user_id}", -cost), (f"host:{s['host_id']}", cost - cut), ("orbit:revenue", cut)],
                 memo=f"session:{sid}")
@@ -371,6 +378,19 @@ def heartbeat(token: str = Form(...), conn=Depends(get_db)):
     )
     if cur.rowcount == 0:
         raise HTTPException(401, "unknown host token")
+    return {"ok": True}
+
+
+@app.post("/api/hosts/ready")
+def host_ready(token: str = Form(...), conn=Depends(get_db)):
+    """The host program calls this once the model is loaded. Billing starts now, not before."""
+    s = conn.execute(
+        "SELECT s.id FROM sessions s JOIN hosts h ON h.id = s.host_id "
+        "WHERE h.token = ? AND h.status != 'removed' AND s.ended_at IS NULL", (token,)
+    ).fetchone()
+    if s is None:
+        raise HTTPException(404, "unknown host token or no running session")
+    conn.execute("UPDATE sessions SET ready_at = COALESCE(ready_at, datetime('now')) WHERE id = ?", (s["id"],))
     return {"ok": True}
 
 

@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     started_at  TEXT NOT NULL DEFAULT (datetime('now')),
     ended_at    TEXT,
     minutes     INTEGER,
-    cost_cents  INTEGER
+    cost_cents  INTEGER,
+    ready_at    TEXT  -- when the host said the model is loaded; billing starts here
 );
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 """
@@ -67,8 +68,16 @@ def init(path: str | None = None) -> None:
     conn = connect(path)
     try:
         conn.executescript(SCHEMA)
+        migrate(conn)
     finally:
         conn.close()
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    """Bring an existing orbit.db up to the current schema. Safe to run every start."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
+    if "ready_at" not in cols:
+        conn.execute("ALTER TABLE sessions ADD COLUMN ready_at TEXT")
 
 
 @contextmanager
