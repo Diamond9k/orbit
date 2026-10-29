@@ -35,8 +35,8 @@ The previous builder failed by widening scope, so keep each item to its named fi
 
 ## Later
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
-- Cycle 1 (review/2026-10-28-1717) went to review: GET instead of POST, tests read a real
-  file, requirements.txt wiped. Branch can be deleted; item 1 stays on top.
+- Branches review/2026-10-28-1717, -1735, -1856, -1923 and escalate/2026-10-28-1856 are
+  swarm attempts at the host program, now merged by hand. Cooper can delete them.
 - Edit a listed machine's price without removing it.
 - Direct browser-to-host link with the relay as fallback, for speed.
 - Model fit read from the Hugging Face file list, not only the name.
@@ -56,3 +56,5 @@ The previous builder failed by widening scope, so keep each item to its named fi
 - Starting a second session sends you to the running one and now says why on that page.
 - Host program step 1: `host/orbit_host.py` sends the heartbeat every minute from the token in
   `host/token.txt` (gitignored). Built by Claude after the swarm escalated it.
+- Swarm escalations merge themselves (a `build/` branch), so the builder stops repeating an
+  item main never learned was stuck. The critic's reasons now show in the swarm window.
