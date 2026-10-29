@@ -31,6 +31,9 @@ The previous builder failed by widening scope, so keep each item to its named fi
 - Cycle 1 (review/2026-10-28-1717) went to review: GET instead of POST, tests read a real
   file, requirements.txt wiped. Branch can be deleted; item 1 stays on top.
 - Edit a listed machine's price without removing it.
+- Hosts page earnings, real numbers only (rule 5): "most you can earn: $X/hr with every machine
+  busy" from host prices; optional "what you paid" next to earned-so-far from the ledger; after
+  30 days online, measured hours rented and payback at that measured rate. No predicted return.
 - Direct browser-to-host link with the relay as fallback, for speed.
 - Model fit read from the Hugging Face file list, not only the name.
 - A real domain and a small rented box for Orbit once strangers are paying strangers.
