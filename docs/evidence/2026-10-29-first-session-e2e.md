@@ -64,7 +64,8 @@ money was dev test funds. It proves the mechanism, not the milestone.
 - The host's `last_seen` lagged its real last moment by the length of one held inbox request
   (about 20 s) in this run; the user was charged less, not more. The code now refreshes
   `last_seen` every half second while a request is held. That change came after this run; a
-  unit test covers it, this end-to-end run does not.
+  unit test covers it, this end-to-end run does not. The rerun in
+  `2026-10-29-sealed-session-e2e.md` does: there the session ended at the host's last heartbeat.
 - Run once. Not repeated.
 
 ## Rerun it

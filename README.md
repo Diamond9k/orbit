@@ -30,17 +30,27 @@ counts the minutes, and moves the money. It never runs a model and never sees a 
    router with nothing to configure.
 3. Gets paid for every minute the machine is used. Nothing for listing it.
 
-Today the host program is one Python file that needs llama.cpp installed (the `llama` command):
+Today the host program is one Python file that needs llama.cpp installed (the `llama` command)
+and one package for the sealing:
 
 ```
 # put the token from the Hosts page in host/token.txt, then
+python3 -m pip install -r host/requirements.txt
 ORBIT_URL=https://where-orbit-runs python3 host/orbit_host.py
 ```
 
 It heartbeats, starts `llama serve` for the model a user chose, tells Orbit when it is ready
-(billing starts then), relays the conversation to the model, and stops the server when the
-session ends. Settings: `ORBIT_URL`, `ORBIT_LLAMA_CMD` (default `llama serve`), `ORBIT_LLAMA_PORT`
-(default `8081`).
+(billing starts then), offers the browser a key and relays the sealed conversation to the model,
+and stops the server when the session ends. Settings: `ORBIT_URL`, `ORBIT_LLAMA_CMD` (default
+`llama serve`), `ORBIT_LLAMA_PORT` (default `8081`).
+
+## Privacy, exactly
+
+The conversation is sealed between the browser and the host's machine: Orbit relays envelopes
+it cannot open and deletes them when the session ends. The host's machine runs the model and can
+read everything; the page says so. Protecting the conversation from the host too needs enclave
+hardware the browser can check, which no consumer PC offers today. What each party can see, what a
+verified host would be, and what has actually been shown are in `docs/PRIVACY.md`.
 
 ## The rules Orbit is built on
 
@@ -124,7 +134,9 @@ not by making Orbit bigger.
 ```
 orbit/app.py          pages, sessions, host API, chat relay, Stripe hook
 orbit/ledger.py       the only code that moves money
+orbit/static/seal.js  the browser's half of the sealing (WebCrypto)
 host/orbit_host.py    the host program: heartbeat, run the model, relay the chat
+host/seal.py          the host's half of the sealing; docs/PRIVACY.md says what it does and does not protect
 orbit/fit.py          does this model fit on that GPU
 orbit/auth.py         sign-in
 orbit/db.py           SQLite schema
@@ -154,18 +166,19 @@ python3 -m pytest
 - Live session counter: minutes, cost so far, time left.
 - Host listing with a private token. Host program: heartbeat, runs the chosen model with
   llama.cpp, says ready, relays the chat, stops the model when the session ends.
-- Chat inside the session, relayed through Orbit. Unsealed for now; the page says so. Orbit keeps
-  messages only while the session runs and deletes them when it ends.
+- Chat inside the session, sealed between the browser and the host's machine. Orbit relays
+  envelopes it cannot open, keeps them only while the session runs and deletes them when it ends.
+  The page says the host's machine can read the conversation, because it can.
 
 **Next, in order**
-1. **Seal the chat.** Browser and host program encrypt bodies end to end; Orbit relays envelopes
-   it cannot open. Waits on one owner decision (`docs/KEYSTONE.md`).
+1. **Verified hosts.** The model runs inside enclave hardware and the browser checks the
+   attestation before sending a word. Designed in `docs/PRIVACY.md`; waits on the owner.
 2. **Host program installs like an app** on Windows, Mac and Linux, with plain steps on the Hosts page.
 3. **The guide.** Reacts to session events, not timers: model loaded, first answer, idle, time
    running low. One tip per event, shown once. Never sees the chat.
 4. **Host payouts.** Money actually leaves Orbit to hosts, recorded in the ledger.
-5. **Host tiers.** "Verified" for machines with enclave hardware that pass attestation,
-   "community" for everyone else. Labels earned by the hardware.
+5. **Host tiers on the pages.** "Verified" and "community", with the exact wording from
+   `docs/PRIVACY.md`. Labels earned by the hardware.
 
 ## How it began
 

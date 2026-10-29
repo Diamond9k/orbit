@@ -25,7 +25,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 BASE_URL = os.environ.get("ORBIT_BASE_URL", "http://localhost:8000")
 STORE_AMOUNTS_CENTS = [500, 1000, 2500]  # what the store offers, in dollars of hardware time
 HOST_TIMEOUT_SECONDS = int(os.environ.get("ORBIT_HOST_TIMEOUT", "180"))  # unseen this long mid-session: the host is gone
-MESSAGE_MAX_CHARS = 64000  # one chat message, either direction
+MESSAGE_MAX_CHARS = 96000  # one chat message, either direction: 64000 characters of text once sealed into an envelope
 LONGPOLL_MAX_SECONDS = 25  # how long a messages request may wait for something new
 
 HERE = Path(__file__).parent
