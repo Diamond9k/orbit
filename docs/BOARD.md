@@ -17,6 +17,11 @@ session, a closed window and a model that forgets. Conversation memory is not st
   the reasons, instead of a third attempt.
 - Nothing unmerged is deleted on a timer. A stale branch is listed under "For Cooper" with the
   command; Cooper deletes.
+- Model choice, Cooper's rule (2026-10-29): first ask whether the work needs a model at all
+  (tests, screenshots, overflow and contrast checks are scripts); then whether an open model on
+  Cooper's own PC can do it for nothing (the local llama.cpp, the swarm); then a cheaper Claude
+  model; Fable last, for judgement-critical work, one at a time and announced with its cost. Every
+  Claude agent draws on the same plan limits as Cooper's own sessions.
 - Stop: Cooper's word, or a file named `workspace/STOP`, means no new task is assigned; running
   owners finish the step they are on, commit, push, and report.
 - Recovery after a crash: read this file, `docs/KEYSTONE.md`, `git worktree list`,
