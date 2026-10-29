@@ -33,7 +33,10 @@ def test_a_pipe_in_the_note_is_escaped_so_the_table_keeps_its_columns(tmp_path):
     p = tmp_path / "ledger.md"
     ledger.add(str(p), task="T9", worker="local", minutes=1, result="failed", note="a | b", date="2026-10-29 05:10")
     last = p.read_text(encoding="utf-8").splitlines()[-1]
-    assert last.count("|") == 7  # six cells need seven pipes; the note's pipe is escaped as \|
+    # Six cells need seven column pipes; the note's own pipe is still there, escaped, so eight in all.
+    # (The first version of this test said seven: a spec mistake the local model's correct output exposed.)
+    assert last.count("|") == 8
+    assert last.count(" | ") == 5  # the column separators: still six cells
     assert "a \\| b" in last
 
 
