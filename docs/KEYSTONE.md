@@ -142,7 +142,9 @@ director's read; a stronger-model review for money, sessions and the host progra
 ("Create Unsafe Agents"), so the director cannot start the swarm's own loop. Instead the director
 drives the local model through plain chat calls: spec and tests first, the model answers with one
 complete file, the director writes it and runs the tests, two attempts at most. That is the first
-bounded test (T6, the ledger tool); its result is in the ledger.
+bounded test (T6, the ledger tool). Result at 04:18: accepted; the 14B wrote the 72-line tool
+from the tests in 196 s at no cost, and the one failing test was the director's own mistake,
+corrected; pull request 27. Driver: `swarm/local_task.py`.
 
 **Evidence, by kind.** Code-supported: 73 tests on `keystone/seal-adversary`, 56 on
 `keystone/fleet`, 53 on the paused `keystone/ui`. Controlled: nothing new. Real people: none.

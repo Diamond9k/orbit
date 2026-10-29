@@ -98,7 +98,7 @@ harness reports when an agent finishes; a killed agent's usage is "unmeasured", 
 ## The first bounded test: T6, the ledger tool
 
 Spec: `tests/test_ledger.py` (seven tests), committed first on `local/ledger`. Worker: the local
-14B through one plain chat call per attempt (this session's permission classifier refuses to
+14B through one plain chat call per attempt (`swarm/local_task.py`; this session's permission classifier refuses to
 launch aider with `--yes-always`, so the director plays aider's part: spec and tests in, one
 complete file out, the director writes it and runs the tests), two attempts, twenty-five minutes
 each at most, prompt saved with the run.
