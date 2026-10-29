@@ -157,6 +157,10 @@ research is done by the director in pieces. Merge or send back pull request 25.
 **Next meaningful step.** After Cooper's go: local tasks one at a time through the ladder, the
 host-as-an-app build first.
 
+**Sign-off, 04:35.** Cooper: "save this going to sleep I will message Keystone in claude terminal chat
+when the agent should arise". Everything above is pushed; the fleet stays paused; no process of
+Keystone's runs. Keystone does nothing until Cooper's message, then starts from the decisions list.
+
 ### 2026-10-29 03:45 CDT (UTC-05:00) (third run: crash recovery, the merges, the fleet)
 
 **What happened between runs.** Cooper merged pull requests 22, 23 and 24 himself; main is
