@@ -15,12 +15,30 @@ The previous builder failed by widening scope, so keep each item to its named fi
    who provides the first attested machine. Consumer hardware cannot do this; it stays community.
 6. **The guide.** Reacts to session events, not timers: model loaded, first answer sent, user
    idle, time running low, session ended. One tip per event, shown once. Answers questions
-   from session data. Never sees the chat.
-7. **Hosts paid, live on the site.** One number from the ledger. The scoreboard.
+   from session data. Never sees the chat. Its model gets counts and states only, never an
+   email, a host name or a word of the conversation (recon: Arc OS put emails in a prompt).
+7. **Hosts paid, live on the site.** One number from the ledger. The scoreboard. From the recon:
+   the number is a ledger sum, never a counter; a count cut off by a limit shows "100+", never a
+   false exact figure; every figure is a link that lists the rows behind it; a percentage shows
+   only above a minimum Cooper sets; a failed read shows the error, never a stale number.
 8. **Host tiers on the pages.** "Verified" for machines that pass item 5, "community" for everyone
    else, with the exact wording from docs/PRIVACY.md next to every machine and in every session.
-9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly.
+   "Verified" shows only from an attestation that ran on this session; a check that did not run
+   shows "not checked", never a pass. Tier is written only by the server, never by the host.
+9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly. The recipe from the
+   ARC billing audit (recon batch 5): Stripe Connect Express, separate charges and transfers; the
+   onboarding route returns a single-use link and a refresh route mints a new one; status is
+   re-read from Stripe each time; no ready account answers 409 "needs connect", never a payout to
+   the platform. The weekly job writes a proposed batch, `UNIQUE(week)`, that Cooper approves
+   (rule 13); a second run that week does nothing. Each transfer posts through `ledger.post(...,
+   once="payout:<id>")`. The week ends at local midnight computed in two passes so DST cannot
+   shift it. The job records each run (ok or failed) and the scoreboard shows when it last ran.
+   A fee that cannot be read is unknown, never 0; verify Connect fees on stripe.com before
+   setting any host take. Done only when one real transfer has landed.
 10. **Stream tokens** through the sealed relay: the host seals partial replies, the page appends them.
+   Test it with a fake host program (no model, an injected clock, `[[slow]]` and `[[drop]]` in
+   the prompt to make it stall or vanish mid-reply), so minute counting and a host dropping
+   mid-session are covered without a GPU.
 
 ## Later
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
@@ -49,6 +67,17 @@ The previous builder failed by widening scope, so keep each item to its named fi
   program. Integrity, not privacy; only worth it if the page can say that plainly.
 - The session page's key exchange has no automated browser test (no browser driver in the repo).
   Add one before the verified tier, when the browser starts checking attestations.
+
+- Stripe refunds and disputes: post balancing reversal rows (`once="refund:<id>"`) when Stripe
+  sends `charge.refunded` or `charge.dispute.created`. Today neither is handled. Before strangers pay.
+- Daily reconciliation: hardware time sold in the ledger against Stripe charges, host credits
+  against Stripe transfers; any mismatch goes to Cooper, never fixed by a guess. With item 9.
+- Model list carries each model's licence and allowed regions, "unknown" when not known
+  (several open-weight licences went research-only or region-fenced in 2026).
+- Swarm, when the fleet resumes (Cooper's call): a stall alarm (no progress in N minutes) and a
+  spend cap per run; fixed exit codes for the item runner (0 ok, 3 waiting, 4 refused, 5 error).
+- UI blueprint loop (marketing-creatives/loop/) waits on Cooper's 3 to 5 reference screens.
+  When a round is kept, its rules go into a docs/DESIGN.md that every page is built from.
 
 ## Done
 - v0.1 web app: sign-in, hardware-time store, double-entry ledger, model fit from the name,
@@ -89,3 +118,11 @@ The previous builder failed by widening scope, so keep each item to its named fi
   `orbit/static/seal.js`, checked against each other under Node). The page says "Sealed from
   Orbit" and, in the same breath, that the host's machine can read the conversation. The research
   on protecting it from the host too is `docs/PRIVACY.md`. Built by Keystone at Cooper's direction.
+- Recon applied (2026-10-30): a card payment and a session's charge each post exactly once, even
+  when Stripe retries or two sweeps race (`ledger.post(..., once=key)`, `ledger_once` table). The
+  webhook credits only paid checkouts and names `STRIPE_WEBHOOK_SECRET` when it is unset. Host
+  tokens are stored as SHA-256. A test walks every host route with bad tokens and every
+  signed-in route without a cookie. `.claude/settings.json` denies .env reads and pushes to main;
+  the critic must show proof; auto-merge is bound to the tested commit. Money figures use tabular
+  digits; Inter, the navbar blur and the all-caps label are gone; the home page no longer says
+  the conversation never passes through Orbit.

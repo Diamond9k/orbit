@@ -43,4 +43,6 @@ jobs:
           if ! gh pr view "$BRANCH" >/dev/null 2>&1; then
             gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
           fi
-          gh pr merge "$BRANCH" --auto --squash
+          # Merge only the commit these tests just passed. If the branch moved since, the
+          # merge is refused and the newer push's own run takes over.
+          gh pr merge "$BRANCH" --auto --squash --match-head-commit "$GITHUB_SHA"

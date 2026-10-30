@@ -198,6 +198,10 @@ def checkout(amount_cents: int = Form(...), user=Depends(require_user)):
 
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request, conn=Depends(get_db)):
+    # Fail closed: with no secret set, a signature made with an empty key would check out, so
+    # anyone could credit themselves. Refuse until the secret is configured.
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(503, "STRIPE_WEBHOOK_SECRET is not set")
     import stripe
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
@@ -205,13 +209,15 @@ async def stripe_webhook(request: Request, conn=Depends(get_db)):
         event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
     except Exception:
         raise HTTPException(400, "bad signature")
-    if event["type"] == "checkout.session.completed":
+    # A completed checkout is not always a paid one (delayed methods finish later and send
+    # async_payment_succeeded). Credit only money Stripe says has arrived, once per checkout.
+    if event["type"] in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
         s = event["data"]["object"]
-        uid = int(s["metadata"]["user_id"])
-        cents = int(s["amount_total"])
-        already = conn.execute("SELECT 1 FROM ledger WHERE memo = ? LIMIT 1", (f"stripe:{s['id']}",)).fetchone()
-        if not already:
-            ledger.post(conn, [("stripe:clearing", -cents), (f"user:{uid}", cents)], memo=f"stripe:{s['id']}")
+        if "payment_status" in s and s["payment_status"] == "paid":
+            uid = int(s["metadata"]["user_id"])
+            cents = int(s["amount_total"])
+            ledger.post(conn, [("stripe:clearing", -cents), (f"user:{uid}", cents)],
+                        memo=f"stripe:{s['id']}", once=f"stripe:{s['id']}")
     return {"ok": True}
 
 
@@ -358,14 +364,13 @@ def post_session_charge(conn: sqlite3.Connection, sid: int) -> bool:
                      (sid,)).fetchone()
     if s is None or not s["cost_cents"]:
         return False
-    if conn.execute("SELECT 1 FROM ledger WHERE memo = ? LIMIT 1", (f"session:{sid}",)).fetchone():
-        return False
     cost = s["cost_cents"]
     cut = cost * ORBIT_CUT_PERCENT // 100
-    # Posted by the one function allowed to move money.
-    ledger.post(conn, [(f"user:{s['user_id']}", -cost), (f"host:{s['host_id']}", cost - cut), ("orbit:revenue", cut)],
-                memo=f"session:{sid}")
-    return True
+    # Posted by the one function allowed to move money, at most once per session even when
+    # two sweeps race for it.
+    txn = ledger.post(conn, [(f"user:{s['user_id']}", -cost), (f"host:{s['host_id']}", cost - cut), ("orbit:revenue", cut)],
+                      memo=f"session:{sid}", once=f"session:{sid}")
+    return txn is not None
 
 
 def sweep(conn: sqlite3.Connection) -> None:
@@ -397,7 +402,7 @@ def sweep(conn: sqlite3.Connection) -> None:
     unposted = conn.execute(
         "SELECT s.id FROM sessions s WHERE s.ended_at IS NOT NULL AND s.cost_cents > 0 "
         "AND s.ended_at < datetime('now', '-60 seconds') "
-        "AND NOT EXISTS (SELECT 1 FROM ledger l WHERE l.memo = 'session:' || s.id)").fetchall()
+        "AND NOT EXISTS (SELECT 1 FROM ledger_once o WHERE o.key = 'session:' || s.id)").fetchall()
     for r in unposted:
         post_session_charge(conn, r["id"])
 
@@ -480,7 +485,7 @@ def add_host(request: Request, name: str = Form(...), gpu: str = Form(...), vram
     token = secrets.token_urlsafe(24)
     conn.execute(
         "INSERT INTO hosts (owner_id, name, gpu, vram_gb, price_cents_per_hour, token) VALUES (?, ?, ?, ?, ?, ?)",
-        (user["id"], name.strip(), gpu.strip(), vram_gb, price_cents, token),
+        (user["id"], name.strip(), gpu.strip(), vram_gb, price_cents, auth.token_key(token)),
     )
     hosts = conn.execute("SELECT * FROM hosts WHERE status != 'removed' ORDER BY status DESC, price_cents_per_hour").fetchall()
     return render(request, "hosts.html", user=user, hosts=hosts, error=None, new_token=token, _conn=conn)
@@ -511,6 +516,7 @@ def heartbeat(token: str = Form(...), conn=Depends(get_db)):
     The reply names the session this machine should be running, so the host program knows
     which model to load: {"session": {"id": ..., "model": ...}} or {"session": null}.
     """
+    token = auth.token_key(token)
     cur = conn.execute(
         "UPDATE hosts SET last_seen = datetime('now'), status = CASE WHEN status = 'busy' THEN 'busy' ELSE 'online' END "
         "WHERE token = ? AND status != 'removed'", (token,)
@@ -532,6 +538,7 @@ def _host_session(conn: sqlite3.Connection, token: str):
 @app.post("/api/hosts/ready")
 def host_ready(token: str = Form(...), conn=Depends(get_db)):
     """The host program calls this once the model is loaded. Billing starts now, not before."""
+    token = auth.token_key(token)
     s = _host_session(conn, token)
     if s is None:
         raise HTTPException(404, "unknown host token or no running session")
@@ -547,6 +554,7 @@ async def host_inbox(token: str = Form(...), after: int = Form(0), wait: float =
     Asking counts as proof of life, like a heartbeat. The reply also names the running session,
     so the host learns at once when it ended and can stop the model.
     """
+    token = auth.token_key(token)
     cur = conn.execute("UPDATE hosts SET last_seen = datetime('now') WHERE token = ? AND status != 'removed'", (token,))
     if cur.rowcount == 0:
         raise HTTPException(401, "unknown host token")
@@ -568,6 +576,7 @@ async def host_inbox(token: str = Form(...), after: int = Form(0), wait: float =
 @app.post("/api/hosts/reply")
 def host_reply(token: str = Form(...), session_id: int = Form(...), body: str = Form(...), conn=Depends(get_db)):
     """The host program posts the model's answer for the running session."""
+    token = auth.token_key(token)
     s = _host_session(conn, token)
     if s is None or s["id"] != session_id:
         raise HTTPException(404, "unknown host token or no such running session")
@@ -580,6 +589,7 @@ def host_reply(token: str = Form(...), session_id: int = Form(...), body: str = 
 
 @app.post("/api/hosts/offline")
 def go_offline(token: str = Form(...), conn=Depends(get_db)):
+    token = auth.token_key(token)
     cur = conn.execute("UPDATE hosts SET status = 'offline' WHERE token = ? AND status != 'busy'", (token,))
     if cur.rowcount == 0:
         raise HTTPException(409, "unknown token or host is mid-session")
