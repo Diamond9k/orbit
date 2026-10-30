@@ -1,6 +1,6 @@
 /* Orbit overrides on top of Bootstrap 5. Keep this file small. */
 :root, [data-bs-theme=dark] {
-  --bs-body-font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bs-body-font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --bs-primary: #5d8dff; --bs-primary-rgb: 93, 141, 255;
   --bs-link-color: #8ab4ff; --bs-link-color-rgb: 138, 180, 255; --bs-link-hover-color: #a9c6ff;
   --bs-body-bg: #0b0d14; --bs-body-color: #e8ebf3;
@@ -9,7 +9,7 @@
 [data-bs-theme=dark] .btn-primary { --bs-btn-bg: #5d8dff; --bs-btn-border-color: #5d8dff; --bs-btn-hover-bg: #4a7bf0; --bs-btn-hover-border-color: #4a7bf0; --bs-btn-color: #071024; --bs-btn-hover-color: #071024; }
 [data-bs-theme=dark] .btn-outline-light { --bs-btn-border-color: #2f3754; }
 [data-bs-theme=dark] .card { --bs-card-bg: #121626; --bs-card-border-color: #232a3f; }
-[data-bs-theme=dark] .navbar { background: rgba(11,13,20,.85) !important; backdrop-filter: blur(12px); border-bottom: 1px solid #1c2236; }
+[data-bs-theme=dark] .navbar { background: #0b0d14 !important; border-bottom: 1px solid #1c2236; }
 [data-bs-theme=dark] .form-control { background: #0f1220; border-color: #2a324a; }
 [data-bs-theme=dark] .form-control:focus { border-color: #5d8dff; box-shadow: 0 0 0 .25rem rgba(93,141,255,.25); }
 [data-bs-theme=dark] .table { --bs-table-bg: transparent; }
@@ -23,12 +23,14 @@ h1, h2, h3, .display-5, .display-4 { letter-spacing: -.02em; }
 .step-num { width: 2rem; height: 2rem; display: inline-grid; place-items: center; border-radius: 50%; background: var(--bs-primary); color: #071024; font-weight: 800; font-size: .9rem; }
 .stat-n { font-size: 2.2rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
 .price-n { font-size: 1.6rem; font-weight: 800; }
+/* Money and time line up digit under digit. */
+.stat-n, .price-n, .table, #elapsed, #cost, #left { font-variant-numeric: tabular-nums; }
 .chat-log { min-height: 280px; max-height: 55vh; overflow-y: auto; display: flex; flex-direction: column; gap: .5rem; padding: .25rem; }
 .msg { padding: .6rem .9rem; border-radius: .75rem; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg-user { align-self: flex-end; background: var(--bs-primary); color: #fff; }
 .msg-host { align-self: flex-start; background: var(--bs-tertiary-bg); }
 .msg-system { align-self: center; font-size: .9rem; }
-.kicker { font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--bs-primary); }
+.kicker { font-size: .875rem; font-weight: 600; color: var(--bs-secondary-color); }
 .card.pad { padding: .5rem; }
 footer { border-top: 1px solid var(--bs-border-color); }
 
