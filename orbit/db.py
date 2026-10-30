@@ -26,6 +26,13 @@ CREATE TABLE IF NOT EXISTS ledger (
 CREATE INDEX IF NOT EXISTS ledger_account ON ledger(account);
 CREATE INDEX IF NOT EXISTS ledger_txn ON ledger(txn_id);
 
+-- Postings that must happen at most once (a Stripe payment, a session's charge), keyed by
+-- what caused them. Claimed in the same transaction as the ledger rows.
+CREATE TABLE IF NOT EXISTS ledger_once (
+    key     TEXT PRIMARY KEY,
+    txn_id  TEXT NOT NULL
+);
+
 -- A machine someone is offering. Owned by a user.
 CREATE TABLE IF NOT EXISTS hosts (
     id                   INTEGER PRIMARY KEY,
@@ -95,6 +102,10 @@ def migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE sessions ADD COLUMN ready_at TEXT")
     if "end_reason" not in cols:
         conn.execute("ALTER TABLE sessions ADD COLUMN end_reason TEXT")
+    # Postings made before ledger_once existed claim their keys now, so a retry after the
+    # upgrade still finds them already posted.
+    conn.execute("INSERT OR IGNORE INTO ledger_once (key, txn_id) SELECT memo, MIN(txn_id) FROM ledger "
+                 "WHERE memo LIKE 'stripe:%' OR memo LIKE 'session:%' GROUP BY memo")
 
 
 @contextmanager

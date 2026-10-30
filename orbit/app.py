@@ -198,6 +198,10 @@ def checkout(amount_cents: int = Form(...), user=Depends(require_user)):
 
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request, conn=Depends(get_db)):
+    # Fail closed: with no secret set, a signature made with an empty key would check out, so
+    # anyone could credit themselves. Refuse until the secret is configured.
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(503, "STRIPE_WEBHOOK_SECRET is not set")
     import stripe
     payload = await request.body()
     sig = request.headers.get("stripe-signature", "")
@@ -205,13 +209,15 @@ async def stripe_webhook(request: Request, conn=Depends(get_db)):
         event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)
     except Exception:
         raise HTTPException(400, "bad signature")
-    if event["type"] == "checkout.session.completed":
+    # A completed checkout is not always a paid one (delayed methods finish later and send
+    # async_payment_succeeded). Credit only money Stripe says has arrived, once per checkout.
+    if event["type"] in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
         s = event["data"]["object"]
-        uid = int(s["metadata"]["user_id"])
-        cents = int(s["amount_total"])
-        already = conn.execute("SELECT 1 FROM ledger WHERE memo = ? LIMIT 1", (f"stripe:{s['id']}",)).fetchone()
-        if not already:
-            ledger.post(conn, [("stripe:clearing", -cents), (f"user:{uid}", cents)], memo=f"stripe:{s['id']}")
+        if "payment_status" in s and s["payment_status"] == "paid":
+            uid = int(s["metadata"]["user_id"])
+            cents = int(s["amount_total"])
+            ledger.post(conn, [("stripe:clearing", -cents), (f"user:{uid}", cents)],
+                        memo=f"stripe:{s['id']}", once=f"stripe:{s['id']}")
     return {"ok": True}
 
 
@@ -358,14 +364,13 @@ def post_session_charge(conn: sqlite3.Connection, sid: int) -> bool:
                      (sid,)).fetchone()
     if s is None or not s["cost_cents"]:
         return False
-    if conn.execute("SELECT 1 FROM ledger WHERE memo = ? LIMIT 1", (f"session:{sid}",)).fetchone():
-        return False
     cost = s["cost_cents"]
     cut = cost * ORBIT_CUT_PERCENT // 100
-    # Posted by the one function allowed to move money.
-    ledger.post(conn, [(f"user:{s['user_id']}", -cost), (f"host:{s['host_id']}", cost - cut), ("orbit:revenue", cut)],
-                memo=f"session:{sid}")
-    return True
+    # Posted by the one function allowed to move money, at most once per session even when
+    # two sweeps race for it.
+    txn = ledger.post(conn, [(f"user:{s['user_id']}", -cost), (f"host:{s['host_id']}", cost - cut), ("orbit:revenue", cut)],
+                      memo=f"session:{sid}", once=f"session:{sid}")
+    return txn is not None
 
 
 def sweep(conn: sqlite3.Connection) -> None:
@@ -397,7 +402,7 @@ def sweep(conn: sqlite3.Connection) -> None:
     unposted = conn.execute(
         "SELECT s.id FROM sessions s WHERE s.ended_at IS NOT NULL AND s.cost_cents > 0 "
         "AND s.ended_at < datetime('now', '-60 seconds') "
-        "AND NOT EXISTS (SELECT 1 FROM ledger l WHERE l.memo = 'session:' || s.id)").fetchall()
+        "AND NOT EXISTS (SELECT 1 FROM ledger_once o WHERE o.key = 'session:' || s.id)").fetchall()
     for r in unposted:
         post_session_charge(conn, r["id"])
 

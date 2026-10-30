@@ -217,7 +217,9 @@ def test_a_lost_charge_is_posted_once(client):
     assert conn.execute("SELECT COUNT(*) FROM ledger WHERE memo = 'session:1'").fetchone()[0] == 3
     conn.close()
     # pretend the process died between closing the session and posting the charge, two minutes ago
+    # (the rows and their once-key are written in one transaction, so a crash loses both)
     _set("DELETE FROM ledger WHERE memo = 'session:1'")
+    _set("DELETE FROM ledger_once WHERE key = 'session:1'")
     _set("UPDATE sessions SET ended_at = ? WHERE id = 1", _stamp(2))
     client.get("/account")  # any sweep repairs it
     client.get("/account")  # and a second sweep does not bill twice

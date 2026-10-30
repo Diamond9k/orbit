@@ -20,7 +20,14 @@ class LedgerError(ValueError):
     pass
 
 
-def post(conn: sqlite3.Connection, rows: list[tuple[str, int]], memo: str = "") -> str:
+def post(conn: sqlite3.Connection, rows: list[tuple[str, int]], memo: str = "",
+         once: str | None = None) -> str | None:
+    """Write one balancing set of rows. Returns its txn_id.
+
+    With `once`, the posting happens at most once for that key, ever: the key is claimed in the
+    same transaction as the rows, so two callers racing (a retried Stripe event, two sweeps)
+    cannot both post. The loser gets None and nothing is written.
+    """
     if len(rows) < 2:
         raise LedgerError("a posting needs at least two rows")
     if any(not isinstance(amt, int) for _, amt in rows):
@@ -29,11 +36,20 @@ def post(conn: sqlite3.Connection, rows: list[tuple[str, int]], memo: str = "") 
         raise LedgerError("rows must sum to zero")
     txn_id = uuid.uuid4().hex
     with tx(conn):
+        if once is not None:
+            claimed = conn.execute("INSERT OR IGNORE INTO ledger_once (key, txn_id) VALUES (?, ?)", (once, txn_id))
+            if claimed.rowcount == 0:
+                return None
         conn.executemany(
             "INSERT INTO ledger (txn_id, account, amount_cents, memo) VALUES (?, ?, ?, ?)",
             [(txn_id, acct, amt, memo) for acct, amt in rows],
         )
     return txn_id
+
+
+def posted(conn: sqlite3.Connection, once: str) -> bool:
+    """True when a posting with this `once` key has been written."""
+    return conn.execute("SELECT 1 FROM ledger_once WHERE key = ?", (once,)).fetchone() is not None
 
 
 def balance(conn: sqlite3.Connection, account: str) -> int:
