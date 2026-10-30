@@ -1,4 +1,5 @@
 """SQLite connection and schema. One file on disk, nothing else to run."""
+import hashlib
 import os
 import sqlite3
 from contextlib import contextmanager
@@ -41,7 +42,7 @@ CREATE TABLE IF NOT EXISTS hosts (
     gpu                  TEXT NOT NULL,
     vram_gb              REAL NOT NULL,
     price_cents_per_hour INTEGER NOT NULL,
-    token                TEXT NOT NULL UNIQUE,
+    token                TEXT NOT NULL UNIQUE,  -- 'sha256:<hex>' of the host's token, never the token
     status               TEXT NOT NULL DEFAULT 'offline',  -- offline | online | busy
     last_seen            TEXT,
     created_at           TEXT NOT NULL DEFAULT (datetime('now'))
@@ -102,6 +103,10 @@ def migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE sessions ADD COLUMN ready_at TEXT")
     if "end_reason" not in cols:
         conn.execute("ALTER TABLE sessions ADD COLUMN end_reason TEXT")
+    # Host tokens were stored as given before 2026-10-30; keep only their hashes (auth.token_key).
+    for r in conn.execute("SELECT id, token FROM hosts WHERE token NOT LIKE 'sha256:%'").fetchall():
+        conn.execute("UPDATE hosts SET token = ? WHERE id = ?",
+                     ("sha256:" + hashlib.sha256(r["token"].encode()).hexdigest(), r["id"]))
     # Postings made before ledger_once existed claim their keys now, so a retry after the
     # upgrade still finds them already posted.
     conn.execute("INSERT OR IGNORE INTO ledger_once (key, txn_id) SELECT memo, MIN(txn_id) FROM ledger "

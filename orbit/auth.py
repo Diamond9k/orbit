@@ -11,6 +11,15 @@ _signer = URLSafeSerializer(SECRET, salt="orbit-session")
 COOKIE = "orbit_session"
 
 
+def token_key(token: str) -> str:
+    """What Orbit stores for a host token: its SHA-256, never the token itself.
+
+    A token is 24 random bytes, so a plain hash is enough; a copy of orbit.db cannot be used
+    to impersonate a host.
+    """
+    return "sha256:" + hashlib.sha256(token.encode()).hexdigest()
+
+
 def _hash(password: str, salt: bytes) -> bytes:
     return hashlib.scrypt(password.encode(), salt=salt, n=2**14, r=8, p=1, dklen=32)
 
