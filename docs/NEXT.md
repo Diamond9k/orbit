@@ -24,6 +24,7 @@ The previous builder failed by widening scope, so keep each item to its named fi
 
 ## Later
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
+- WiCi One (docs/SCAN-wici.md) ships Q4 2026: check the host program runs on one unchanged.
 - Branches review/2026-10-28-1717, -1735, -1856, -1923 and escalate/2026-10-28-1856 are
   swarm attempts at the host program, now merged by hand. Cooper can delete them.
 - Edit a listed machine's price without removing it.
