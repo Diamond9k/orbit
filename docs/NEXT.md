@@ -6,6 +6,18 @@ Add anything else worth doing to Later, one line each. Do not reorder without Co
 ## Now
 The previous builder failed by widening scope, so keep each item to its named files, use stdlib and existing imports only, and never touch requirements.txt.
 
+1. **Per-token billing on the one-host flow.** Decision 2026-11-02-tokens-not-minutes. The host
+   program counts the tokens it produced per reply and reports the count with the sealed reply;
+   the browser counts what it received; the ledger charges per request at the host's price per
+   million tokens and pays the host the same row. Minutes stop being charged. Host sets the price
+   per million tokens on the Hosts page. README first line and CLAUDE.md rules 2 and 3 are
+   rewritten in this item to say exactly what now runs. Files: host/orbit_host.py, orbit/ledger.py,
+   orbit/app.py, the hosts and session templates, tests.
+2. **Warm models and a price per model.** Host keeps listed models loaded; lists price per
+   model; no download at session start.
+3. **Route a request to any warm host** that has the model. No exclusive session.
+4. **The browser agent.** Picks the model, trims the request, runs the tool loop, seals it all.
+
 
 ## Then
 5. **Verified hosts.** The protected-compute boundary designed in docs/PRIVACY.md: the model runs
