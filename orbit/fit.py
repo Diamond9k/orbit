@@ -42,7 +42,7 @@ def check(model: str, vram_gb: float) -> Fit:
         return Fit("unknown", params, quant, None, "the model name does not say its quantization")
     needs = round(params * bpp * OVERHEAD, 1)
     if needs <= vram_gb * 0.9:
-        return Fit("fits", params, quant, needs, f"needs about {needs} GB, host has {vram_gb} GB")
+        return Fit("fits", params, quant, needs, f"needs about {needs:g} GB, host has {vram_gb:g} GB")
     if needs <= vram_gb:
-        return Fit("tight", params, quant, needs, f"needs about {needs} GB, host has {vram_gb} GB, little room for context")
-    return Fit("too_big", params, quant, needs, f"needs about {needs} GB, host has only {vram_gb} GB")
+        return Fit("tight", params, quant, needs, f"needs about {needs:g} GB, host has {vram_gb:g} GB, little room for context")
+    return Fit("too_big", params, quant, needs, f"needs about {needs:g} GB, host has only {vram_gb:g} GB")

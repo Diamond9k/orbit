@@ -2,183 +2,66 @@
 {% block title %}Session · Orbit{% endblock %}
 {% block body %}
 {% if flash %}<div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-exclamation-circle"></i><div>{{ flash }}</div></div>{% endif %}
+{% set phase = 'ended' if s.ended_at else 'starting' if not s.ready_at else 'running' %}
+<div id="session" data-sid="{{ s.id }}" data-phase="{{ phase }}" data-sandbox="{{ '1' if sandbox else '0' }}"
+     {% if phase == 'running' %}data-ready="{{ ready_epoch }}" data-rate="{{ s.price_cents_per_hour }}" data-balance="{{ balance }}"{% endif %}>
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-  <div>
+  <div class="min-w-0">
     <div class="kicker">Session</div>
-    <h1 class="h3 mb-1">{{ s.model }}</h1>
-    <div class="text-secondary">On <strong class="text-body">{{ s.host_name }}</strong> · {{ s.gpu }} · {{ s.vram_gb }} GB · {{ s.price_cents_per_hour | dollars }} an hour</div>
+    <h1 class="h3 mb-1 text-break">{{ s.model }}</h1>
+    <div class="text-secondary">On <strong class="text-body">{{ s.host_name }}</strong> · {{ s.gpu }} · {{ s.vram_gb | gb }} GB · {{ s.price_cents_per_hour | dollars }} an hour</div>
   </div>
-  {% if s.ended_at %}<span class="badge text-bg-secondary fs-6">ended</span>{% elif not s.ready_at %}<span class="badge text-bg-secondary fs-6">starting</span>{% else %}<span class="badge text-bg-success fs-6">running</span>{% endif %}
+  {% if phase == 'ended' %}<span class="badge text-bg-secondary fs-6">ended</span>{% elif phase == 'starting' %}<span class="badge text-bg-secondary fs-6">starting</span>{% else %}<span class="badge text-bg-success fs-6"><span class="dot live me-2"></span>running</span>{% endif %}
 </div>
 
-{% if s.ended_at %}
+{% if phase == 'ended' %}
 <div class="card mb-3"><div class="card-body">
   <div class="row g-3">
-    <div class="col-sm-4"><div class="text-secondary small">Minutes used</div><div class="stat-n">{{ s.minutes }}</div></div>
-    <div class="col-sm-4"><div class="text-secondary small">You paid</div><div class="stat-n">{{ s.cost_cents | dollars }}</div></div>
-    <div class="col-sm-4"><div class="text-secondary small">Left</div><div class="stat-n">{{ balance | dollars }}</div></div>
+    <div class="col-4"><div class="text-secondary small">Minutes used</div><div class="stat-n">{{ s.minutes }}</div></div>
+    <div class="col-4"><div class="text-secondary small">You paid</div><div class="stat-n">{{ s.cost_cents | dollars }}</div></div>
+    <div class="col-4"><div class="text-secondary small">Left</div><div class="stat-n">{{ balance | dollars }}</div></div>
   </div>
   {% if s.end_reason == 'out_of_time' %}
   <div class="text-secondary mt-3">Your hardware time ran out, so the session ended on its own. You were charged for the minutes you had.</div>
   {% elif s.end_reason == 'host_lost' %}
   <div class="text-secondary mt-3">The machine stopped answering, so the session ended. You were charged only up to the last minute it was reachable.</div>
+  {% elif s.end_reason == 'sandbox_idle' %}
+  <div class="text-secondary mt-3">The session page was closed, so the sandbox ended the session. You were charged up to the last moment the page was open.</div>
   {% elif s.end_reason == 'stopped' %}
   <div class="text-secondary mt-3">You stopped it. The conversation ended with the session; Orbit does not keep it.</div>
   {% endif %}
 </div></div>
-<div class="d-flex gap-2"><a class="btn btn-primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="btn btn-outline-light" href="/account">Account</a></div>
-{% elif not s.ready_at %}
+<div class="d-flex gap-2"><a class="btn btn-primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="btn btn-outline-light" href="/account">See the ledger</a></div>
+{% elif phase == 'starting' %}
 <div class="card mb-3"><div class="card-body d-flex align-items-center gap-3">
-  <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+  <div class="spinner-border spinner-border-sm text-secondary" role="status"><span class="visually-hidden">Loading</span></div>
   <div><strong>Waiting for the machine. You are not being charged.</strong>
-    <div class="text-secondary small">The clock starts when the model is loaded and ready.</div></div>
+    <div class="text-secondary small">The clock starts when the model is loaded and ready.{% if sandbox %} In the sandbox this takes a few seconds and no model is loaded.{% endif %}</div></div>
 </div></div>
-<script>setTimeout(function () { location.reload(); }, 5000);</script>
-<form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
+<form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-outline-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
 {% else %}
 <div class="card mb-3"><div class="card-body">
   <div class="row g-3">
-    <div class="col-sm-4"><div class="text-secondary small">Running for</div><div class="stat-n" id="elapsed">0:00</div></div>
-    <div class="col-sm-4"><div class="text-secondary small">Cost so far</div><div class="stat-n" id="cost">$0.00</div></div>
-    <div class="col-sm-4"><div class="text-secondary small">Time left</div><div class="stat-n" id="left">{{ minutes_left }} min</div></div>
+    <div class="col-4"><div class="text-secondary small">Running for</div><div class="stat-n" id="elapsed">0:00</div></div>
+    <div class="col-4"><div class="text-secondary small">Cost so far</div><div class="stat-n" id="cost">$0.00</div></div>
+    <div class="col-4"><div class="text-secondary small">Time left</div><div class="stat-n" id="left">{{ minutes_left }} min</div></div>
   </div>
 </div></div>
-<script>
-(function () {
-  var started = {{ ready_epoch }} * 1000, rate = {{ s.price_cents_per_hour }}, balance = {{ balance }};
-  function tick() {
-    var secs = Math.max(0, Math.floor((Date.now() - started) / 1000));
-    var mins = Math.max(1, Math.ceil(secs / 60));
-    var cost = Math.ceil(rate * mins / 60);
-    var left = Math.max(0, Math.floor((balance - cost) * 60 / rate));
-    document.getElementById('elapsed').textContent = Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2);
-    document.getElementById('cost').textContent = '$' + (cost / 100).toFixed(2);
-    document.getElementById('left').textContent = left + ' min';
-    if (left <= 0 && !window.orbitReloading) { window.orbitReloading = true; setTimeout(function () { location.reload(); }, 3000); }
-  }
-  tick(); setInterval(tick, 1000);
-})();
-</script>
 <div class="card mb-3"><div class="card-body">
-  <div id="chat" class="chat-log mb-3" aria-live="polite"></div>
+  <div id="chat" class="chat-log mb-3" aria-live="polite"><div id="chat-empty" class="chat-empty">{% if sandbox %}Say anything. The reply is scripted and tells you what happened to your message on the way.{% else %}The model is ready. Say something.{% endif %}</div></div>
   <form id="say" class="d-flex gap-2" autocomplete="off">
-    <input id="msg" class="form-control" placeholder="Say something to the model" autofocus maxlength="64000">
-    <button class="btn btn-primary">Send</button>
+    <input id="msg" class="form-control form-control-lg" placeholder="Say something to the model" aria-label="Message" autofocus maxlength="{{ 8000 if sandbox else 64000 }}">
+    <button class="btn btn-primary px-4">Send</button>
   </form>
-  <div class="d-flex align-items-start gap-2 mt-2 small">
+  <div class="d-flex flex-column flex-sm-row align-items-start gap-2 mt-3 small">
     <span id="seal-state" class="badge text-bg-secondary">Waiting for the host's key</span>
     <span id="seal-note" class="text-secondary">Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it.</span>
   </div>
 </div></div>
-<script src="/static/seal.js"></script>
-<script>
-(function () {
-  var sid = {{ s.id }}, after = 0, seen = {}, thinking = null;
-  var log = document.getElementById('chat'), form = document.getElementById('say'), input = document.getElementById('msg');
-  var badge = document.getElementById('seal-state'), note = document.getElementById('seal-note');
-  var STORE = 'orbit-seal-' + sid, WAIT_FOR_KEY_MS = 10000, loadedAt = Date.now();
-  var sealer = null, state = 'waiting', lastHostHello = null, needHello = false, foreign = false;
-  // Every sentence here must stay exactly true (rule 5). See docs/PRIVACY.md.
-  var copy = {
-    waiting: ['text-bg-secondary', "Waiting for the host's key",
-      "Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it."],
-    sealed: ['text-bg-success', 'Sealed from Orbit',
-      "Orbit relays envelopes it cannot open and deletes them when the session ends. The host's machine runs the model and can read this conversation; nothing checks that machine yet."],
-    unsealed: ['text-bg-warning', 'Unsealed',
-      "This host's program offered no key, so messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too."],
-    insecure: ['text-bg-warning', 'Unsealed',
-      "This page was not opened over https, so the browser cannot seal. Messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too."]
-  };
-  function setState(s) { state = s; badge.className = 'badge ' + copy[s][0]; badge.textContent = copy[s][1]; note.textContent = copy[s][2]; }
-  function add(sender, text, extra) {
-    var d = document.createElement('div');
-    d.className = 'msg msg-' + sender + (extra ? ' ' + extra : '');
-    d.textContent = text;
-    log.appendChild(d); log.scrollTop = log.scrollHeight;
-    return d;
-  }
-  function keep(s) { s.export().then(function (k) { try { sessionStorage.setItem(STORE, JSON.stringify(k)); } catch (e) {} }).catch(function () {}); }
-  async function sealerFor() {
-    if (sealer) return sealer;
-    try { var saved = sessionStorage.getItem(STORE); if (saved) sealer = await OrbitSeal.restore(sid, 'user', JSON.parse(saved)); } catch (e) { sealer = null; }
-    if (!sealer) { sealer = await OrbitSeal.create(sid, 'user'); keep(sealer); }
-    return sealer;
-  }
-  function post(body) {
-    return fetch('/sessions/' + sid + '/messages', {method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: 'body=' + encodeURIComponent(body)});
-  }
-  async function sendHello() {
-    needHello = false;
-    var r = await post(sealer.hello());
-    if (r.ok) { var j = await r.json(); seen[j.id] = true; }
-  }
-  async function show(m) {
-    if (seen[m.id]) return;
-    seen[m.id] = true; after = Math.max(after, m.id);
-    var env = OrbitSeal.available ? OrbitSeal.parse(m.body) : null;
-    if (env && env.t === 'hello') {
-      if (env.from === 'host') {
-        lastHostHello = env;
-        try { await (await sealerFor()).accept(env); needHello = true; foreign = false; setState('sealed'); }
-        catch (e) { add('system', 'The host offered a key this browser could not use: ' + e.message, 'text-warning'); }
-      } else if (sealer && env.pk === sealer.publicB64) { needHello = false; foreign = false; }
-      else { foreign = true; }  // another tab answered the host, so its key is current and ours is not
-      return;
-    }
-    if (m.sender === 'host' && thinking) { thinking.remove(); thinking = null; }
-    if (env && env.t === 'msg') {
-      if (!sealer || !sealer.ready() || foreign) { add('system', 'A sealed message this tab cannot open.', 'text-secondary'); return; }
-      try { add(m.sender, await sealer.unseal(env)); }
-      catch (e) { add('system', 'A sealed message this tab cannot open (' + e.message + ').', 'text-secondary'); }
-      return;
-    }
-    add(m.sender, m.body);
-  }
-  async function poll() {
-    try {
-      var r = await fetch('/sessions/' + sid + '/messages?after=' + after + '&wait=15', {credentials: 'same-origin'});
-      if (!r.ok) throw new Error(r.status);
-      var d = await r.json();
-      for (var i = 0; i < d.messages.length; i++) await show(d.messages[i]);
-      if (needHello && sealer && sealer.ready() && !foreign) await sendHello();
-      if (state === 'waiting' && Date.now() - loadedAt > WAIT_FOR_KEY_MS) setState('unsealed');
-      if (d.ended) { location.reload(); return; }
-      setTimeout(poll, 100);
-    } catch (e) { setTimeout(poll, 3000); }
-  }
-  form.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    var text = input.value.trim();
-    if (!text) return;
-    if (state === 'waiting') { add('system', "Waiting for the host's key. Try again in a moment.", 'text-secondary'); return; }
-    input.value = '';
-    var body = text;
-    if (state === 'sealed') {
-      try {
-        if (foreign) { sealer = await OrbitSeal.create(sid, 'user'); keep(sealer); await sealer.accept(lastHostHello); foreign = false; await sendHello(); }
-        body = await sealer.seal(text);
-      } catch (err) { add('system', 'Not sent: could not seal (' + err.message + ').', 'text-warning'); return; }
-    }
-    try {
-      var r = await post(body);
-      if (!r.ok) {
-        if (state === 'sealed') sealer.sent -= 1;  // the host never saw this number
-        var j = await r.json(); add('system', 'Not sent: ' + (j.detail || r.status), 'text-warning'); return;
-      }
-      var ok = await r.json();
-      seen[ok.id] = true;
-      add('user', text);
-      if (!thinking) thinking = add('host', 'Thinking…', 'text-secondary');
-    } catch (err) {
-      if (state === 'sealed') sealer.sent -= 1;
-      add('system', 'Not sent: Orbit did not answer.', 'text-warning');
-    }
-  });
-  setState(OrbitSeal.available ? 'waiting' : 'insecure');
-  poll();
-})();
-</script>
-<form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
+<form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-outline-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
 {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+{% if not s.ended_at %}<script src="/static/seal.js"></script><script src="/static/session.js"></script>{% endif %}
 {% endblock %}

@@ -7,6 +7,18 @@ The user gets one whole machine to themselves for as long as they need, with a g
 The host is paid for every hour their machine is used. Orbit sits in the middle: it matches,
 counts the minutes, and moves the money. It never runs a model and never sees a conversation.
 
+## Try it
+
+A public sandbox runs the real code with simulated machines and test funds. No email, no card.
+The address is in the repository description. To run the same sandbox on your own computer:
+
+```
+python3 -m pip install -r requirements.txt
+ORBIT_SANDBOX=1 python3 -m orbit
+```
+
+What the sandbox is and is not: `docs/decisions/2026-11-20-public-sandbox.md`.
+
 ## The three roles
 
 | Role | Who | What runs there |
@@ -105,6 +117,7 @@ All optional, set as environment variables, or put `KEY=value` lines in a file n
 | Name | What | Default |
 |---|---|---|
 | `ORBIT_DEV` | `1` enables test funds and shows a warning in the footer | off |
+| `ORBIT_SANDBOX` | `1` runs the public demo: guests, test funds, simulated machines, no cards, no host programs | off |
 | `ORBIT_DB` | path to the SQLite file | `orbit.db` |
 | `ORBIT_SECRET` | signs sign-in cookies. Set one for real use or everyone is signed out on restart | random |
 | `ORBIT_CUT_PERCENT` | Orbit's share of each session | `20` |
@@ -137,11 +150,13 @@ orbit/ledger.py       the only code that moves money
 orbit/static/seal.js  the browser's half of the sealing (WebCrypto)
 host/orbit_host.py    the host program: heartbeat, run the model, relay the chat
 host/seal.py          the host's half of the sealing; docs/PRIVACY.md says what it does and does not protect
+orbit/sandbox.py      sandbox mode: guests, test funds, a simulated host
+app.py                entry point for the sandbox on Vercel
 orbit/fit.py          does this model fit on that GPU
 orbit/auth.py         sign-in
 orbit/db.py           SQLite schema
 orbit/templates/      HTML pages
-orbit/static/         style.css and vendored Bootstrap (MIT)
+orbit/static/         style.css, the page scripts and vendored Bootstrap (MIT)
 tests/                ledger, fit, URL cleaning and full-loop tests
 ```
 

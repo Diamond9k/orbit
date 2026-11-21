@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}About · Orbit{% endblock %}
+{% block body %}
+<section class="hero hero-sm">
+  <div class="kicker mb-3">About Orbit</div>
+  <h1 class="display-5 mb-3">Run a model on hardware a person controls, as easily as opening a browser tab.</h1>
+  <p class="lead text-secondary mb-0">Open models are free. The hardware is not, and most of it sits idle. Orbit is the broker between the two. The direction is simple: any open model, on any computer, with nobody in the middle keeping the data.</p>
+</section>
+
+<div class="row g-3 mb-5">
+  <div class="col-md-4"><div class="card h-100"><div class="card-body">
+    <i class="bi bi-window role-ico"></i><div class="fw-semibold mt-3 mb-1">User</div>
+    <div class="text-secondary small">Types a model name or pastes a Hugging Face link. Sees which machines fit it. Adds hardware time, shown in dollars and minutes. Starts. Stops. Sees exactly what was used.</div>
+  </div></div></div>
+  <div class="col-md-4"><div class="card h-100"><div class="card-body">
+    <i class="bi bi-gpu-card role-ico"></i><div class="fw-semibold mt-3 mb-1">Host</div>
+    <div class="text-secondary small">Lists a machine and sets a price per hour. Runs the host program. It dials out, so a home router needs no changes. Paid for every minute of use. Nothing for listing.</div>
+  </div></div></div>
+  <div class="col-md-4"><div class="card h-100"><div class="card-body">
+    <i class="bi bi-arrow-left-right role-ico"></i><div class="fw-semibold mt-3 mb-1">Orbit</div>
+    <div class="text-secondary small">Matches, counts minutes, moves money. Takes {{ cut }}% of each session. It never runs a model. It relays the conversation as sealed envelopes and deletes them when the session ends.</div>
+  </div></div></div>
+</div>
+
+<div class="row g-4 mb-5">
+  <div class="col-lg-6">
+    <div class="kicker mb-2">Privacy, exactly</div>
+    <h2 class="h3 mb-3">What each party can see.</h2>
+    <div class="card"><div class="table-responsive"><table class="table mb-0 align-middle small">
+      <thead><tr><th></th><th>Orbit</th><th>The host</th></tr></thead>
+      <tbody>
+        <tr><td class="fw-semibold">The words</td><td>No. Only envelope sizes and timing.</td><td>Yes. The model runs there in plain text.</td></tr>
+        <tr><td class="fw-semibold">Who used which machine, when, how long, which model</td><td>Yes.</td><td>Only a session number.</td></tr>
+        <tr><td class="fw-semibold">After the session</td><td>Envelopes are deleted.</td><td>Not verifiable today.</td></tr>
+      </tbody></table></div></div>
+    <p class="text-secondary small mt-3">The page says "sealed from Orbit". It does not say "private", because the host can read everything. To protect the conversation from the host too, the model must run inside enclave hardware that the browser can check. That is designed and not built. The full map is in <a href="{{ repo_url }}/blob/main/docs/PRIVACY.md" rel="noopener">docs/PRIVACY.md</a>.</p>
+  </div>
+  <div class="col-lg-6">
+    <div class="kicker mb-2">The rules</div>
+    <h2 class="h3 mb-3">What Orbit is built on.</h2>
+    <ol class="rules">
+      <li><strong>A broker, not a middleman.</strong> Orbit forwards sealed envelopes it cannot open.</li>
+      <li><strong>One user, one machine.</strong> Exclusive for the session. No sharing, no bidding.</li>
+      <li><strong>Hosts are paid for use,</strong> never for listing.</li>
+      <li><strong>No promises, no claims.</strong> Every number shown is measured or set by a host. Unknown shows as unknown.</li>
+      <li><strong>Money is double-entry.</strong> Every movement is rows that sum to zero. <a href="/health">/health</a> reports if the books stop balancing.</li>
+      <li><strong>No datacenter.</strong> One ordinary machine runs Orbit. Hosts do the heavy work.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="row g-4 mb-5">
+  <div class="col-lg-6">
+    <div class="kicker mb-2">Works today</div>
+    <h2 class="h3 mb-3">Version 0.1.</h2>
+    <ul class="ticks">
+      <li>Model fit from the Hugging Face name or link, with "unknown" when the name does not say.</li>
+      <li>Exclusive sessions, charged by the minute from the moment the host says the model is ready.</li>
+      <li>Sessions end on their own when the time runs out or the host stops answering. The charge covers only the time that was reachable.</li>
+      <li>Double-entry ledger. The host is paid and Orbit's share is taken when the session ends.</li>
+      <li>Host program: heartbeat, runs the model with llama.cpp, relays the chat, stops the model at the end.</li>
+      <li>Chat sealed between the browser and the host's machine: ECDH P-256, HKDF, AES-256-GCM.</li>
+      <li>The full loop settled correctly on real hardware: one host, a Radeon RX 580 with 8 GB.</li>
+    </ul>
+  </div>
+  <div class="col-lg-6">
+    <div class="kicker mb-2">Not built yet</div>
+    <h2 class="h3 mb-3">Next, in order.</h2>
+    <ol class="rules">
+      <li><strong>Verified hosts.</strong> The model runs in enclave hardware and the browser checks the attestation before it sends a word.</li>
+      <li><strong>The guide.</strong> One tip per session event. It never sees the chat.</li>
+      <li><strong>Host payouts.</strong> Money leaves Orbit to hosts, recorded in the ledger.</li>
+      <li><strong>Host program installs like an app</strong> on Windows, Mac and Linux.</li>
+      <li><strong>Streamed replies</strong> through the sealed relay.</li>
+    </ol>
+    <p class="text-secondary small">Card payments are wired to Stripe and need keys. The build order is in <a href="{{ repo_url }}/blob/main/docs/NEXT.md" rel="noopener">docs/NEXT.md</a>.</p>
+  </div>
+</div>
+
+<div class="card mb-5"><div class="card-body p-4">
+  <div class="kicker mb-2">For a builder who joins</div>
+  <h2 class="h3 mb-3">Read it, run it, check it.</h2>
+  <div class="row g-4">
+    <div class="col-md-6">
+      <p class="text-secondary">Orbit is small on purpose: Python, FastAPI, SQLite, server-rendered pages, no build step. One file moves money. The tests cover the ledger, the session clock, recovery and the sealing, including an adversary suite.</p>
+      <ul class="links">
+        <li><a href="{{ repo_url }}" rel="noopener"><i class="bi bi-github me-2"></i>Source code</a></li>
+        <li><a href="{{ repo_url }}/blob/main/CLAUDE.md" rel="noopener">The goal and the rules</a></li>
+        <li><a href="{{ repo_url }}/tree/main/docs/decisions" rel="noopener">Decisions, one file each, dated</a></li>
+        <li><a href="{{ repo_url }}/tree/main/docs/evidence" rel="noopener">Evidence: what was actually shown</a></li>
+      </ul>
+    </div>
+    <div class="col-md-6">
+      <div class="text-secondary small mb-2">Run the whole thing on one computer:</div>
+<pre class="code">git clone {{ repo_url }}.git
+cd orbit
+python3 -m pip install -r requirements.txt
+ORBIT_SANDBOX=1 python3 -m orbit</pre>
+      <div class="text-secondary small">Then open http://localhost:8000. Leave <code>ORBIT_SANDBOX</code> unset to run the real broker with real hosts.</div>
+    </div>
+  </div>
+</div></div>
+
+{% if sandbox %}
+<div class="card border-warning"><div class="card-body p-4">
+  <div class="kicker mb-2">This site</div>
+  <h2 class="h3 mb-3">What the sandbox is.</h2>
+  <p class="text-secondary">This address runs the real Orbit code in sandbox mode, so anyone can walk the loop without a card or a GPU. The booking, the minute clock, the ledger and the key exchange are the real code paths. These parts are not real:</p>
+  <ul class="text-secondary mb-3">
+    <li>The machines are simulated. No model runs. Replies are scripted and say so.</li>
+    <li>The money is test funds. No card is taken.</li>
+    <li>The simulated host runs on the same server as Orbit, so the sandbox shows how sealing works, not the privacy it gives with a real host.</li>
+    <li>You enter as a guest. No email or password is asked for or kept. Everything is wiped often.</li>
+  </ul>
+  {% if not user %}<form method="post" action="/sandbox/enter"><button class="btn btn-primary" data-busy="Opening…">Enter the sandbox</button></form>{% else %}<a class="btn btn-primary" href="/run">Run a model</a>{% endif %}
+</div></div>
+{% endif %}
+{% endblock %}

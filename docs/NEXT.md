@@ -23,6 +23,9 @@ The previous builder failed by widening scope, so keep each item to its named fi
 10. **Stream tokens** through the sealed relay: the host seals partial replies, the page appends them.
 
 ## Later
+- Store host tokens hashed, not plain, so a copied database cannot impersonate a host.
+- Limit sign-in attempts per email and per address.
+- A second key for sign-in cookies so `ORBIT_SECRET` can be changed without signing everyone out.
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
 - Branches review/2026-10-28-1717, -1735, -1856, -1923 and escalate/2026-10-28-1856 are
   swarm attempts at the host program, now merged by hand. Cooper can delete them.
@@ -51,6 +54,13 @@ The previous builder failed by widening scope, so keep each item to its named fi
   Add one before the verified tier, when the browser starts checking attestations.
 
 ## Done
+- 2026-11-20, asked for by Cooper: public sandbox on Vercel (`ORBIT_SANDBOX=1`, decision file of
+  the same date), new look, About page. Closed along the way: the Stripe hook accepted events
+  signed with an empty secret; test funds took any amount; a machine name could run script on the
+  account page; NaN passed as a price or memory size; `/login` crashed for a signed-in person;
+  sign-in cookies never expired and were not marked secure. Added: a content security policy with
+  no inline script or style, a cross-site form check, model names limited to Hugging Face
+  characters. Tests: tests/test_sandbox.py, tests/test_security.py.
 - v0.1 web app: sign-in, hardware-time store, double-entry ledger, model fit from the name,
   exclusive sessions charged by the minute, host listing with token, heartbeat API.
 - Site rebuilt on self-hosted Bootstrap. Home is the workbench. Friendly errors. Live session

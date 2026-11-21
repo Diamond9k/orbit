@@ -1,0 +1,9 @@
+# The sandbox needs the web app and host/seal.py. Nothing else is uploaded.
+tests/
+docs/
+swarm/
+prompts/
+workspace/
+.github/
+host/orbit_host.py
+*.db

@@ -1,31 +1,51 @@
 {% extends "base.html" %}
-{% block title %}Orbit{% endblock %}
+{% block title %}Orbit · Run open models on hardware people own{% endblock %}
 {% block body %}
 {% if flash %}<div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-exclamation-circle"></i><div>{{ flash }}</div></div>{% endif %}
 
 {% if active and not model %}
-<div class="alert alert-success d-flex justify-content-between align-items-center">
-  <span><i class="bi bi-circle-fill me-2" style="font-size:.5rem"></i>Your session on <strong>{{ active.host_name }}</strong> is running.</span>
+<div class="alert alert-success d-flex justify-content-between align-items-center gap-3">
+  <span><span class="dot live me-2"></span>Your session on <strong>{{ active.host_name }}</strong> is running.</span>
   <a class="btn btn-sm btn-success" href="/sessions/{{ active.id }}">Open it</a>
 </div>
 {% endif %}
 
-<form method="get" action="/" class="input-group input-group-lg mb-2">
-  <span class="input-group-text"><i class="bi bi-search"></i></span>
-  <input class="form-control" type="text" name="model" value="{{ model }}" placeholder="Model name or Hugging Face link" autofocus required autocomplete="off" spellcheck="false">
+{% if not model and not user %}
+<section class="hero">
+  <div class="kicker mb-3">Open models on hardware people own</div>
+  <h1 class="display-4 mb-3">Any open model.<br>Any computer.<br><span class="grad">No API credits.</span></h1>
+  <p class="lead text-secondary mb-4">Orbit matches a person who wants to run an open source model with a person who has an idle GPU. You get the whole machine. The host is paid by the minute. Orbit counts the minutes and moves the money. It does not run the model and it does not keep the conversation.</p>
+  <div class="d-flex flex-wrap gap-2">
+    {% if sandbox %}
+    <form method="post" action="/sandbox/enter"><button class="btn btn-primary btn-lg" data-busy="Opening…">Enter the sandbox</button></form>
+    {% else %}
+    <a class="btn btn-primary btn-lg" href="/signup">Get started</a>
+    {% endif %}
+    <a class="btn btn-outline-light btn-lg" href="/about">How it works</a>
+  </div>
+  {% if sandbox %}<p class="text-secondary small mt-3 mb-0">One click. No email, no password, no card. You get $10.00 of test funds.</p>{% endif %}
+</section>
+{% elif not model %}
+<h1 class="h2 mb-3">Run a model</h1>
+{% endif %}
+
+<form method="get" action="/" class="search mb-2">
+  <i class="bi bi-search" aria-hidden="true"></i>
+  <input class="form-control form-control-lg" type="text" name="model" value="{{ model }}" placeholder="Model name or Hugging Face link" aria-label="Model name or Hugging Face link" required autocomplete="off" spellcheck="false" maxlength="300" {{ 'autofocus' if user or model }}>
   <button class="btn btn-primary">Find a machine</button>
 </form>
 <div class="d-flex flex-wrap align-items-center gap-2 mb-4 small text-secondary">
   {% if recent %}
     <span>Recent:</span>
-    {% for r in recent %}<a class="badge rounded-pill text-bg-dark border text-decoration-none" href="/?model={{ r | urlencode }}">{{ r }}</a>{% endfor %}
+    {% for r in recent %}<a class="chip" href="/?model={{ r | urlencode }}">{{ r }}</a>{% endfor %}
   {% else %}
     <span>Try:</span>
-    <a class="badge rounded-pill text-bg-dark border text-decoration-none" href="/?model=bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M">Qwen2.5 7B</a>
-    <a class="badge rounded-pill text-bg-dark border text-decoration-none" href="/?model=bartowski/Meta-Llama-3.1-8B-Instruct-GGUF Q4_K_M">Llama 3.1 8B</a>
-    <a class="badge rounded-pill text-bg-dark border text-decoration-none" href="/?model=bartowski/gemma-2-9b-it-GGUF Q4_K_M">Gemma 2 9B</a>
+    <a class="chip" href="/?model={{ 'bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M' | urlencode }}">Qwen2.5 7B</a>
+    <a class="chip" href="/?model={{ 'bartowski/Meta-Llama-3.1-8B-Instruct-GGUF Q4_K_M' | urlencode }}">Llama 3.1 8B</a>
+    <a class="chip" href="/?model={{ 'bartowski/gemma-2-27b-it-GGUF Q4_K_M' | urlencode }}">Gemma 2 27B</a>
+    <a class="chip" href="/?model={{ 'bartowski/Llama-3.3-70B-Instruct-GGUF Q4_K_M' | urlencode }}">Llama 3.3 70B</a>
   {% endif %}
-  <span class="ms-auto"><i class="bi bi-circle-fill text-success me-1" style="font-size:.5rem"></i>{{ hosts_online }} machine{{ 's' if hosts_online != 1 }} online</span>
+  <span class="ms-auto"><span class="dot live me-1"></span>{{ hosts_online }} machine{{ 's' if hosts_online != 1 }} online</span>
 </div>
 
 {% if model %}
@@ -39,28 +59,30 @@
   {% if results %}
   <div class="d-grid gap-3">
     {% for h, f in results %}
-    <div class="card {{ 'opacity-50' if f.verdict == 'too_big' or h.status != 'online' }}"><div class="card-body row g-3 align-items-center">
-      <div class="col-md-4"><div class="fw-bold">{{ h.name }} {% if h.status == 'busy' %}<span class="badge text-bg-warning ms-1">in use</span>{% endif %}</div><div class="text-secondary small">{{ h.gpu }} · {{ h.vram_gb }} GB</div></div>
-      <div class="col-md-2"><div class="price-n">{{ h.price_cents_per_hour | dollars }}</div><div class="text-secondary small">per hour</div></div>
+    <div class="card machine {{ 'dim' if f.verdict == 'too_big' or h.status != 'online' }}"><div class="card-body row g-3 align-items-center">
+      <div class="col-7 col-md-4"><div class="fw-bold">{{ h.name }} {% if h.status == 'busy' %}<span class="badge text-bg-warning ms-1">in use</span>{% endif %}</div><div class="text-secondary small">{{ h.gpu }} · {{ h.vram_gb | gb }} GB</div></div>
+      <div class="col-5 col-md-2 text-end text-md-start"><div class="price-n">{{ h.price_cents_per_hour | dollars }}</div><div class="text-secondary small">per hour</div></div>
       <div class="col-md-4">
         <span class="badge {{ 'text-bg-success' if f.verdict == 'fits' else 'text-bg-warning' if f.verdict == 'tight' else 'text-bg-danger' if f.verdict == 'too_big' else 'text-bg-secondary' }} mb-1">{{ f.verdict.replace('_', ' ') }}</span>
         <div class="text-secondary small">{{ f.reason }}</div>
       </div>
       <div class="col-md-2 text-md-end">
         {% if h.status == 'busy' %}
-          {% if active %}<a class="btn btn-outline-light btn-sm" href="/sessions/{{ active.id }}">Open session</a>{% else %}<span class="text-secondary small">someone is using it</span>{% endif %}
+          {% if active and active.host_id == h.id %}<a class="btn btn-outline-light btn-sm" href="/sessions/{{ active.id }}">Open session</a>{% else %}<span class="text-secondary small">someone is using it</span>{% endif %}
         {% elif f.verdict != 'too_big' %}
           {% if user %}
             {% if active %}<a class="btn btn-outline-light btn-sm" href="/sessions/{{ active.id }}">Open session</a>
             {% elif balance >= h.price_cents_per_hour %}
-            <form method="post" action="/sessions/start"><input type="hidden" name="model" value="{{ model }}"><input type="hidden" name="host_id" value="{{ h.id }}"><button class="btn btn-primary">Start</button></form>
+            <form method="post" action="/sessions/start"><input type="hidden" name="model" value="{{ model }}"><input type="hidden" name="host_id" value="{{ h.id }}"><button class="btn btn-primary w-100" data-busy="Starting…">Start</button></form>
             {% else %}<a class="btn btn-outline-light" href="/store" title="You need at least one hour on this machine">Add time</a>{% endif %}
+          {% elif sandbox %}<form method="post" action="/sandbox/enter"><button class="btn btn-outline-light btn-sm" data-busy="Opening…">Enter to start</button></form>
           {% else %}<a class="btn btn-outline-light" href="/signup">Sign up to start</a>{% endif %}
         {% endif %}
       </div>
     </div></div>
     {% endfor %}
   </div>
+  {% if sandbox %}<p class="text-secondary small mt-3">These machines and prices are sandbox examples. On the live network every machine and price comes from a host.</p>{% endif %}
   {% else %}
   <div class="card"><div class="card-body">
     <div class="fw-semibold mb-1">No machines are online right now.</div>
@@ -70,18 +92,41 @@
 {% else %}
   <div class="row g-3 mt-2">
     <div class="col-md-4"><div class="card h-100"><div class="card-body">
-      <div class="step-num mb-2">1</div><div class="fw-semibold">Name a model</div>
+      <div class="step-num mb-3">1</div><div class="fw-semibold mb-1">Name a model</div>
       <div class="text-secondary small">Any open model on Hugging Face. Paste the link or the name. Orbit reads the size and says which machines fit, or says "unknown" if it can't tell.</div>
     </div></div></div>
     <div class="col-md-4"><div class="card h-100"><div class="card-body">
-      <div class="step-num mb-2">2</div><div class="fw-semibold">Pick a machine</div>
+      <div class="step-num mb-3">2</div><div class="fw-semibold mb-1">Pick a machine</div>
       <div class="text-secondary small">One price per hour, set by the host. The whole GPU is yours alone until you stop. You pay only for the hardware, not per token.</div>
     </div></div></div>
     <div class="col-md-4"><div class="card h-100"><div class="card-body">
-      <div class="step-num mb-2">3</div><div class="fw-semibold">Start</div>
-      <div class="text-secondary small">The model loads and you talk to it in your browser. Orbit holds a list and a ledger; your conversation never passes through it.</div>
+      <div class="step-num mb-3">3</div><div class="fw-semibold mb-1">Start</div>
+      <div class="text-secondary small">The model loads and you talk to it in your browser. Each message is sealed between your browser and the host's machine. Orbit relays it and deletes it when the session ends.</div>
     </div></div></div>
   </div>
+
+  {% if not user %}
+  <section class="roles mt-5">
+    <div class="kicker mb-2">Three roles</div>
+    <h2 class="h3 mb-4">A broker, not a middleman.</h2>
+    <div class="row g-3">
+      <div class="col-md-4"><div class="card h-100"><div class="card-body">
+        <i class="bi bi-window role-ico"></i><div class="fw-semibold mt-3 mb-1">User</div>
+        <div class="text-secondary small">Someone who wants to run an open model. A web browser. Nothing to install.</div>
+      </div></div></div>
+      <div class="col-md-4"><div class="card h-100"><div class="card-body">
+        <i class="bi bi-gpu-card role-ico"></i><div class="fw-semibold mt-3 mb-1">Host</div>
+        <div class="text-secondary small">Someone with an idle GPU. The host program dials out to Orbit, so it works behind a home router. Models run here. Paid for use, never for listing.</div>
+      </div></div></div>
+      <div class="col-md-4"><div class="card h-100"><div class="card-body">
+        <i class="bi bi-arrow-left-right role-ico"></i><div class="fw-semibold mt-3 mb-1">Orbit</div>
+        <div class="text-secondary small">The machine list, the booking, the ledger. Every money movement is rows that sum to zero. Orbit needs no GPU and runs on one ordinary computer.</div>
+      </div></div></div>
+    </div>
+    <p class="mt-4 mb-0"><a href="/about">What works today, what does not, and what is next <i class="bi bi-arrow-right"></i></a></p>
+  </section>
+  {% else %}
   <div class="text-secondary small mt-4">Have an idle GPU? <a href="/hosts">List it</a> and get paid for every hour it is used.</div>
+  {% endif %}
 {% endif %}
 {% endblock %}
