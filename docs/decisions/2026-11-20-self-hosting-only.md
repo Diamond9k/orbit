@@ -30,8 +30,6 @@ everything, and only enclave hardware could stop a stranger) is gone. One gap is
 dishonest relay could swap keys. With a stranger's machine that needed attestation. With your
 own machine a short fingerprint shown on both ends closes it. That is now item 1 in docs/NEXT.md.
 
-## Open, for Cooper
-- The swarm (`swarm/`, `prompts/`) was built to chase "hosts paid". Its scoreboard now counts
-  use. Its prompts still speak of the old goal. Keep, rewrite or remove.
-- docs/PRIVACY.md, BIRTH.md, FLEET.md, PATH.md and KEYSTONE.md describe the marketplace. They
-  are history now. PRIVACY.md has a note at the top; the rest are untouched.
+## Loose ends, closed the same day
+- The swarm stays. Its prompts now name the new goal, and its scoreboard counts use.
+- The marketplace documents stay as history. Each one says so in its first lines.

@@ -18,7 +18,6 @@ The previous builder failed by widening scope, so keep each item to its named fi
 5. **Direct browser-to-machine link**, with the relay as fallback, for speed.
 
 ## Later
-- Decide what happens to the swarm and the marketplace documents (see the decision file).
 - Fit check from the Hugging Face file list, and for Apple Silicon and CPU-only machines, not only GPU memory.
 - Store host tokens hashed, not plain, so a copied database cannot impersonate a host.
 - Limit sign-in attempts per email and per address.

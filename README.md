@@ -9,8 +9,10 @@ contradict the reason to self-host.
 
 ## Try it
 
-A public sandbox runs the real code with simulated machines. No email, no GPU needed.
-The address is in the repository description. To run the same sandbox on your own computer:
+A public sandbox runs the real code with simulated machines. No email, no GPU needed:
+**https://orbit-sandbox-nu.vercel.app**
+
+To run the same sandbox on your own computer:
 
 ```
 python3 -m pip install -r requirements.txt

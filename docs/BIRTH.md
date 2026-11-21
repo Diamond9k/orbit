@@ -1,3 +1,6 @@
+> History. This file describes Orbit as a GPU marketplace. That was dropped on 2026-11-20:
+> Orbit is now free and self-hosting only (docs/decisions/2026-11-20-self-hosting-only.md).
+
 # The birth of Orbit
 
 28 October 2026. One conversation between Cooper and a Claude session, in one day. This is

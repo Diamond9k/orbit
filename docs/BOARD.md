@@ -1,3 +1,6 @@
+> History. This file describes Orbit as a GPU marketplace. That was dropped on 2026-11-20:
+> Orbit is now free and self-hosting only (docs/decisions/2026-11-20-self-hosting-only.md).
+
 # The board
 
 Durable task state for Keystone's fleet. Lives in the repository so that it survives a crashed
