@@ -1,4 +1,4 @@
-/* The session page: wait for the machine, count the minutes, carry the sealed chat.
+/* The session page: wait for the machine, show the clock, carry the sealed chat.
    Reads its numbers from data- attributes on #session, so the page holds no inline script. */
 (function () {
   'use strict';
@@ -18,17 +18,11 @@
   }
   if (phase !== 'running') return;
 
-  // ---- the counter ----
-  var started = Number(root.dataset.ready) * 1000, rate = Number(root.dataset.rate), balance = Number(root.dataset.balance);
+  // ---- the clock ----
+  var started = Number(root.dataset.ready) * 1000;
   function tick() {
     var secs = Math.max(0, Math.floor((Date.now() - started) / 1000));
-    var mins = Math.max(1, Math.ceil(secs / 60));
-    var cost = Math.ceil(rate * mins / 60);
-    var left = Math.max(0, Math.floor((balance - cost) * 60 / rate));
     document.getElementById('elapsed').textContent = Math.floor(secs / 60) + ':' + ('0' + secs % 60).slice(-2);
-    document.getElementById('cost').textContent = '$' + (cost / 100).toFixed(2);
-    document.getElementById('left').textContent = left + ' min';
-    if (left <= 0 && !window.orbitReloading) { window.orbitReloading = true; setTimeout(function () { location.reload(); }, 3000); }
   }
   tick(); setInterval(tick, 1000);
 
@@ -41,19 +35,19 @@
   var sealer = null, state = 'waiting', lastHostHello = null, needHello = false, foreign = false;
   // Every sentence here must stay exactly true (rule 5). See docs/PRIVACY.md.
   var copy = {
-    waiting: ['text-bg-secondary', "Waiting for the host's key",
-      "Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it."],
-    sealed: ['text-bg-success', 'Sealed from Orbit',
-      "Orbit relays envelopes it cannot open and deletes them when the session ends. The host's machine runs the model and can read this conversation; nothing checks that machine yet."],
+    waiting: ['text-bg-secondary', "Waiting for the machine's key",
+      "The relay passes this conversation on and deletes it when the session ends."],
+    sealed: ['text-bg-success', 'Sealed from the relay',
+      "The relay passes on envelopes it cannot open and deletes them when the session ends. Your machine runs the model and reads this conversation. Nothing yet checks that the relay passed the keys on unchanged."],
     unsealed: ['text-bg-warning', 'Unsealed',
-      "This host's program offered no key, so messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too."],
+      "Your machine's host program offered no key, so messages pass through the relay readable until the session ends, when they are deleted."],
     insecure: ['text-bg-warning', 'Unsealed',
-      "This page was not opened over https, so the browser cannot seal. Messages pass through Orbit readable until the session ends, when they are deleted. The host's machine can read them too."]
+      "This page was not opened over https, so the browser cannot seal. Messages pass through the relay readable until the session ends, when they are deleted."]
   };
   if (sandbox) {
-    // In the sandbox the host is simulated on Orbit's own server, so "Orbit cannot open it" would be false.
+    // In the sandbox the machine is simulated on the relay's own server, so "the relay cannot open it" would be false.
     copy.sealed = ['text-bg-success', 'Sealed (sandbox)',
-      "Your browser and a simulated host exchanged keys, and every message travels as a sealed envelope. The simulated host runs on Orbit's own server, so this shows how the sealing works, not the privacy it gives. With a real host the key stays on the host's machine."];
+      "Your browser and a simulated machine exchanged keys, and every message travels as a sealed envelope. The simulated machine runs on the relay's own server, so this shows how the sealing works, not the privacy it gives. On your own machine the key stays there."];
   }
   function setState(s) { state = s; badge.className = 'badge ' + copy[s][0]; badge.textContent = copy[s][1]; note.textContent = copy[s][2]; }
   function add(sender, text, extra) {
@@ -90,7 +84,7 @@
       if (env.from === 'host') {
         lastHostHello = env;
         try { await (await sealerFor()).accept(env); needHello = true; foreign = false; setState('sealed'); }
-        catch (e) { add('system', 'The host offered a key this browser could not use: ' + e.message, 'text-warning'); }
+        catch (e) { add('system', 'The machine offered a key this browser could not use: ' + e.message, 'text-warning'); }
       } else if (sealer && env.pk === sealer.publicB64) { needHello = false; foreign = false; }
       else { foreign = true; }  // another tab answered the host, so its key is current and ours is not
       return;
@@ -121,7 +115,7 @@
     e.preventDefault();
     var text = input.value.trim();
     if (!text) return;
-    if (state === 'waiting') { add('system', "Waiting for the host's key. Try again in a moment.", 'text-secondary'); return; }
+    if (state === 'waiting') { add('system', "Waiting for the machine's key. Try again in a moment.", 'text-secondary'); return; }
     input.value = '';
     var body = text;
     if (state === 'sealed') {
@@ -144,7 +138,7 @@
       if (!thinking) thinking = add('host', 'Thinking…', 'text-secondary');
     } catch (err) {
       if (state === 'sealed') sealer.sent -= 1;
-      add('system', 'Not sent: Orbit did not answer.', 'text-warning');
+      add('system', 'Not sent: the relay did not answer.', 'text-warning');
     }
   });
   setState(OrbitSeal.available ? 'waiting' : 'insecure');

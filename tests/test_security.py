@@ -34,8 +34,8 @@ def test_every_page_carries_the_headers(client):
 
 def test_no_page_has_inline_script_or_style(client):
     _signup(client)
-    client.post("/hosts", data={"name": "Box", "gpu": "G", "vram_gb": 24, "price_dollars_per_hour": 1})
-    for path in ("/", "/?model=x/M-7B-Q4", "/about", "/hosts", "/store", "/account", "/login", "/signup", "/nope"):
+    client.post("/hosts", data={"name": "Box", "gpu": "G", "vram_gb": 24})
+    for path in ("/", "/?model=x/M-7B-Q4", "/about", "/hosts", "/account", "/login", "/signup", "/nope"):
         text = client.get(path, headers={"accept": "text/html"}).text
         assert "<script>" not in text and " style=" not in text and " onsubmit=" not in text and "onclick=" not in text, path
 
@@ -66,38 +66,26 @@ def test_the_cookie_is_secure_over_https_and_expires(client):
         auth.COOKIE_MAX_AGE = auth_max
 
 
-def test_an_unsigned_stripe_event_never_adds_money(client, monkeypatch):
+def test_there_is_no_money_door_left(client):
     _signup(client)
-    body = b'{"type":"checkout.session.completed","data":{"object":{"id":"cs_x","metadata":{"user_id":"1"},"amount_total":2500}}}'
-    assert client.post("/stripe/webhook", content=body).status_code == 503      # no secret set: shut
-    # With an empty secret the old code checked the signature against a key anyone knows.
-    monkeypatch.setattr(appmod, "STRIPE_SECRET_KEY", "sk_test_x")
-    assert client.post("/stripe/webhook", content=body).status_code == 503
-    monkeypatch.setattr(appmod, "STRIPE_WEBHOOK_SECRET", "whsec_x")
-    assert client.post("/stripe/webhook", content=body, headers={"stripe-signature": "t=1,v1=00"}).status_code == 400
-    assert "$0.00" in client.get("/account").text
-
-
-def test_test_funds_cannot_be_any_amount(client):
-    _signup(client)
-    assert client.post("/store/dev-funds", data={"amount_cents": 10**12}, follow_redirects=False).status_code == 400
-    assert client.post("/store/dev-funds", data={"amount_cents": -500}, follow_redirects=False).status_code == 400
+    for path in ("/store", "/store/checkout", "/store/dev-funds", "/stripe/webhook"):
+        assert client.post(path, data={"amount_cents": 1000}).status_code in (404, 405), path
+    assert "stripe" not in client.get("/").headers["content-security-policy"]
 
 
 def test_a_machine_needs_sane_numbers(client):
     _signup(client)
-    for bad in ({"vram_gb": "nan"}, {"vram_gb": "inf"}, {"price_dollars_per_hour": "nan"}, {"price_dollars_per_hour": "1e9"},
-                {"vram_gb": 0}, {"name": "x" * 61}, {"name": "   "}):
-        data = {"name": "Box", "gpu": "G", "vram_gb": 24, "price_dollars_per_hour": 1, **bad}
+    for bad in ({"vram_gb": "nan"}, {"vram_gb": "inf"}, {"vram_gb": "1e9"}, {"vram_gb": 0}, {"name": "x" * 61}, {"name": "   "}):
+        data = {"name": "Box", "gpu": "G", "vram_gb": 24, **bad}
         r = client.post("/hosts", data=data)
         assert r.status_code == 200 and "<pre" not in r.text, bad
-    assert "<pre" in client.post("/hosts", data={"name": "Box", "gpu": "G", "vram_gb": 24, "price_dollars_per_hour": 1}).text
+    assert "<pre" in client.post("/hosts", data={"name": "Box", "gpu": "G", "vram_gb": 24}).text
 
 
 def test_a_machine_name_cannot_carry_script(client):
     _signup(client)
-    client.post("/hosts", data={"name": "');alert(1);//", "gpu": "<b>G</b>", "vram_gb": 24, "price_dollars_per_hour": 1})
-    page = client.get("/account").text
+    client.post("/hosts", data={"name": "');alert(1);//", "gpu": "<b>G</b>", "vram_gb": 24})
+    page = client.get("/hosts").text
     assert "confirm(" not in page and "<b>G</b>" not in page and "&lt;b&gt;G&lt;/b&gt;" in page
 
 

@@ -1,39 +1,41 @@
 {% extends "base.html" %}
-{% block title %}Hosts · Orbit{% endblock %}
+{% block title %}My machines · Orbit{% endblock %}
 {% block body %}
 <div class="row g-4">
   <div class="col-lg-7">
-    <h1 class="h2 mb-1">Machines</h1>
-    <p class="text-secondary">{% if sandbox %}The sandbox machines, and any you list. Other guests do not see yours.{% else %}Every machine listed on Orbit. Hosts set their own price.{% endif %}</p>
+    <h1 class="h2 mb-1">My machines</h1>
+    <p class="text-secondary">{% if sandbox %}Simulated stand-ins for computers you own. Only you see them.{% else %}The computers you own that run your models. Only you see them and only you can use them.{% endif %}</p>
     <div class="card">
       {% if hosts %}
       <div class="table-responsive"><table class="table mb-0 align-middle">
-        <thead><tr><th>Name</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Status</th></tr></thead>
+        <thead><tr><th>Name</th><th>GPU</th><th>Memory</th><th>Status</th><th></th></tr></thead>
         <tbody>{% for h in hosts %}
-        <tr><td class="fw-semibold">{{ h.name }}</td><td>{{ h.gpu }}</td><td class="text-nowrap">{{ h.vram_gb | gb }} GB</td><td>{{ h.price_cents_per_hour | dollars }}</td>
-            <td><span class="badge {{ 'text-bg-success' if h.status == 'online' else 'text-bg-warning' if h.status == 'busy' else 'text-bg-secondary' }}">{{ h.status }}</span></td></tr>
+        <tr><td class="fw-semibold">{{ h.name }}</td><td>{{ h.gpu }}</td><td class="text-nowrap">{{ h.vram_gb | gb }} GB</td>
+            <td><span class="badge {{ 'text-bg-success' if h.status == 'online' else 'text-bg-warning' if h.status == 'busy' else 'text-bg-secondary' }}">{{ 'running a model' if h.status == 'busy' else h.status }}</span></td>
+            <td class="text-end"><form method="post" action="/hosts/{{ h.id }}/remove" data-confirm="Remove {{ h.name }} from Orbit? You can add it again any time."><button class="btn btn-sm btn-outline-danger" {{ 'disabled' if h.status == 'busy' }}>Remove</button></form></td></tr>
         {% endfor %}</tbody></table></div>
-      {% else %}<div class="card-body text-secondary">No machines listed yet.</div>{% endif %}
+      {% elif user %}<div class="card-body text-secondary">No machine yet. Add one on this page.</div>
+      {% else %}<div class="card-body text-secondary">Your machines show here after you {{ 'enter the sandbox' if sandbox else 'sign in' }}.</div>{% endif %}
     </div>
     <div class="card mt-4"><div class="card-body">
-      <div class="fw-semibold mb-2">How hosting works</div>
+      <div class="fw-semibold mb-2">How a machine joins</div>
       <ol class="text-secondary small mb-0 ps-3 steps">
-        <li>List a machine: name, GPU, memory, your price per hour. You get a private token.</li>
-        <li>Run the host program with that token. It only dials out, so a home router needs no changes.</li>
-        <li>When a user starts a session, the program loads the model and says ready. The clock starts then.</li>
-        <li>You earn for every minute used. Orbit keeps a share of each session and shows it in the ledger.</li>
+        <li>Add the machine here: a name, its GPU and the GPU memory. You get a private token.</li>
+        <li>Run the host program on that machine with the token. It only dials out, so a home router needs no changes.</li>
+        <li>Start a model from any browser. The program loads it with llama.cpp and tells Orbit when it is ready.</li>
+        <li>The model runs on your machine until you stop it. Nobody else can start a model on it.</li>
       </ol>
     </div></div>
   </div>
 
   <div class="col-lg-5">
     <div class="card"><div class="card-body p-4">
-      <h2 class="h4 mb-1">List your machine</h2>
-      <p class="text-secondary">You are paid for every hour it is used. Nothing for listing it.</p>
+      <h2 class="h4 mb-1">Add a machine</h2>
+      <p class="text-secondary">A computer you own. It costs nothing to add and nothing to use.</p>
       {% if new_token %}
-      <div class="alert alert-success"><div class="fw-semibold mb-1">Listed.</div>
-        {% if sandbox %}In the sandbox your machine is simulated, so it is online at once. Run a model on it, then open your account to see what it earned. This is the token a real host program would use:
-        {% else %}Your host token is below. The host program uses it to connect. Keep it private. It is shown once.{% endif %}
+      <div class="alert alert-success"><div class="fw-semibold mb-1">Added.</div>
+        {% if sandbox %}In the sandbox the machine is simulated, so it is online at once. This is the token a real host program would use:
+        {% else %}The host program uses this token to connect. Keep it private. It is shown once.{% endif %}
         <pre class="token mt-2 mb-2" id="token">{{ new_token }}</pre>
         <button type="button" class="btn btn-sm btn-outline-light" data-copy="#token">Copy</button></div>
       {% endif %}
@@ -42,16 +44,13 @@
       <form method="post" action="/hosts">
         <div class="mb-3"><label class="form-label" for="name">Name</label><input class="form-control" id="name" name="name" required maxlength="60" placeholder="e.g. Desk PC"></div>
         <div class="mb-3"><label class="form-label" for="gpu">GPU</label><input class="form-control" id="gpu" name="gpu" required maxlength="60" placeholder="e.g. RTX 4090"></div>
-        <div class="row g-3 mb-3">
-          <div class="col"><label class="form-label" for="vram">GPU memory (GB)</label><input class="form-control" id="vram" name="vram_gb" type="number" step="0.5" min="1" max="2048" required inputmode="decimal"></div>
-          <div class="col"><label class="form-label" for="price">Price per hour ($)</label><input class="form-control" id="price" name="price_dollars_per_hour" type="number" step="0.01" min="0.01" max="1000" required inputmode="decimal"></div>
-        </div>
-        <button class="btn btn-primary w-100">List it</button>
+        <div class="mb-3"><label class="form-label" for="vram">GPU memory (GB)</label><input class="form-control" id="vram" name="vram_gb" type="number" step="0.5" min="1" max="2048" required inputmode="decimal"></div>
+        <button class="btn btn-primary w-100">Add it</button>
       </form>
       {% elif sandbox %}
-      <form method="post" action="/sandbox/enter"><button class="btn btn-primary w-100" data-busy="Opening…">Enter the sandbox to list a machine</button></form>
+      <form method="post" action="/sandbox/enter"><button class="btn btn-primary w-100" data-busy="Opening…">Enter the sandbox to add a machine</button></form>
       {% else %}
-      <a class="btn btn-primary w-100" href="/signup">Get started to list a machine</a>
+      <a class="btn btn-primary w-100" href="/signup">Get started to add a machine</a>
       {% endif %}
     </div></div>
   </div>

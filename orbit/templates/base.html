@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#07080d">
-<meta name="description" content="Orbit: run open source AI models on hardware people own. Pay only for the hardware. No API credits.">
+<meta name="description" content="Orbit: run any open source AI model on a computer you own and use it from any browser. Free and open source. No fees.">
 <title>{% block title %}Orbit{% endblock %}</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
@@ -28,13 +28,12 @@
     <div class="collapse navbar-collapse" id="nav">
       <ul class="navbar-nav me-auto">
         <li class="nav-item"><a class="nav-link" href="/run">Run a model</a></li>
-        <li class="nav-item"><a class="nav-link" href="/hosts">Hosts</a></li>
+        <li class="nav-item"><a class="nav-link" href="/hosts">My machines</a></li>
         <li class="nav-item"><a class="nav-link" href="/about">About</a></li>
       </ul>
       <ul class="navbar-nav align-items-md-center gap-2">
         {% if user %}
           {% if nav_active %}<li class="nav-item"><a class="btn btn-success btn-sm" href="/sessions/{{ nav_active.id }}"><span class="dot live me-2"></span>Session on {{ nav_active.host_name }}</a></li>{% endif %}
-          {% if nav_balance is not none %}<li class="nav-item"><a class="nav-link" href="/store" title="Add time"><strong class="text-body">{{ nav_balance | dollars }}</strong> <i class="bi bi-plus-circle ms-1"></i></a></li>{% endif %}
           <li class="nav-item"><a class="nav-link" href="/account"><i class="bi bi-person-circle me-1"></i>{{ 'Guest' if sandbox else 'Account' }}</a></li>
           <li class="nav-item"><form method="post" action="/logout"><button class="btn btn-outline-light btn-sm">{{ 'Leave' if sandbox else 'Sign out' }}</button></form></li>
         {% elif sandbox %}
@@ -48,7 +47,7 @@
   </div>
 </nav>
 {% if sandbox %}
-<div class="ribbon"><div class="container"><span class="ribbon-tag">Sandbox</span> Simulated machines, test funds, scripted replies. No model runs here and no card is taken. The data is wiped often.</div></div>
+<div class="ribbon"><div class="container"><span class="ribbon-tag">Sandbox</span> Simulated machines and scripted replies. No model runs here. The data is wiped often.</div></div>
 {% endif %}
 
 <main class="flex-grow-1" id="main">
@@ -61,13 +60,12 @@
   <div class="container d-flex flex-column flex-md-row justify-content-between gap-3 text-secondary small">
     <div class="foot-about">
       <div class="fw-semibold text-body">Orbit</div>
-      Orbit holds a list of machines and a ledger. Models run on hosts' machines, not here.
+      Free and open source. Models run on your own machines, not here. No fees, no ads, no rented servers.
       {% if sandbox %}<div class="text-warning mt-2">This is the sandbox. Nothing on it is real.</div>
-      {% elif dev %}<div class="text-warning mt-2">Development mode is on. Test funds are enabled.</div>{% endif %}
+      {% endif %}
     </div>
     <div class="d-flex gap-4 flex-wrap">
-      <div><div class="fw-semibold text-body mb-1">Use</div><a class="d-block link-secondary" href="/run">Run a model</a><a class="d-block link-secondary" href="/store">Add time</a></div>
-      <div><div class="fw-semibold text-body mb-1">Host</div><a class="d-block link-secondary" href="/hosts">List a machine</a></div>
+      <div><div class="fw-semibold text-body mb-1">Use</div><a class="d-block link-secondary" href="/run">Run a model</a><a class="d-block link-secondary" href="/hosts">My machines</a></div>
       <div><div class="fw-semibold text-body mb-1">Project</div><a class="d-block link-secondary" href="/about">About</a><a class="d-block link-secondary" href="{{ repo_url }}" rel="noopener">Source code</a></div>
     </div>
   </div>

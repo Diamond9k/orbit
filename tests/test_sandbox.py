@@ -1,4 +1,4 @@
-"""Sandbox mode: guests, test funds, simulated machines, and nothing real behind them."""
+"""Sandbox mode: guests, simulated machines of their own, and nothing real behind them."""
 import os
 import re
 
@@ -21,7 +21,6 @@ def box(monkeypatch):
     monkeypatch.setattr(appmod, "SANDBOX", True)
     monkeypatch.setattr(appmod, "DEV", False)
     monkeypatch.setitem(appmod.templates.env.globals, "sandbox", True)
-    monkeypatch.setattr(sandbox, "_system_id", None)
     monkeypatch.setattr(sandbox, "_last_tick", 0.0)
     monkeypatch.setattr(sandbox, "LOAD_SECONDS", 0)
     sandbox._hosts.clear()
@@ -57,13 +56,14 @@ def client_plain():
         yield c
 
 
-def test_a_guest_enters_with_test_funds_and_no_details(box):
+def test_a_guest_enters_with_machines_and_no_details(box):
     page = box.get("/").text
-    assert "Enter the sandbox" in page and "Sandbox" in page
+    assert "Try it in the sandbox" in page and "Sandbox" in page
     _enter(box)
     acct = box.get("/account").text
-    assert "$10.00" in acct and "Guest " in acct and "sandbox test funds" in acct
-    assert "@sandbox.invalid" not in acct
+    assert "Guest " in acct and "@sandbox.invalid" not in acct and "$" not in acct
+    machines = box.get("/hosts").text
+    assert all(name in machines for name, _, _ in sandbox.MACHINES) and "online" in machines
 
 
 def test_email_accounts_are_closed(box):
@@ -73,12 +73,13 @@ def test_email_accounts_are_closed(box):
     assert box.post("/login", data={"email": "a@b.co", "password": "longenough"}, follow_redirects=False).headers["location"] == "/"
 
 
-def test_no_host_program_and_no_card(box):
+def test_no_host_program_and_no_money_anywhere(box):
     for path in ("heartbeat", "ready", "inbox", "offline"):
         assert box.post(f"/api/hosts/{path}", data={"token": "x"}).status_code == 403
-    assert box.post("/stripe/webhook", content=b"{}").status_code == 503
     _enter(box)
-    assert box.post("/store/checkout", data={"amount_cents": 500}, follow_redirects=False).status_code == 503
+    for path in ("/store", "/store/checkout", "/store/dev-funds", "/stripe/webhook"):
+        assert box.post(path, data={"amount_cents": 1000}).status_code in (404, 405)
+        assert box.get(path, headers={"accept": "text/html"}).status_code in (404, 405)
 
 
 def test_the_simulated_host_seals_and_answers(box):
@@ -97,10 +98,10 @@ def test_the_simulated_host_seals_and_answers(box):
     assert seal.parse(answer["body"])["t"] == "msg"          # what Orbit stored is an envelope
     text = me.unseal(answer["body"])
     assert "scripted" in text and "3 words" in text and MODEL in text
-    # stop: charged like any session, and the envelopes are gone
+    # stop: closed like any session, and the envelopes are gone
     box.post(f"/sessions/{sid}/stop", follow_redirects=False)
     assert ">ended<" in box.get(f"/sessions/{sid}").text
-    assert box.get("/health").json() == {"ok": True, "unbalanced_txns": 0, "sandbox": True}
+    assert box.get("/health").json() == {"ok": True, "sandbox": True}
     conn = db.connect("test_app.db")
     assert conn.execute("SELECT COUNT(*) AS n FROM messages").fetchone()["n"] == 0
     conn.close()
@@ -124,13 +125,13 @@ def test_a_closed_page_ends_the_session(box):
     sandbox._last_tick = 0.0
     page = box.get("/account").text
     row = db.connect("test_app.db").execute("SELECT end_reason, minutes FROM sessions WHERE id = ?", (sid,)).fetchone()
-    assert row["end_reason"] == "sandbox_idle" and row["minutes"] == 2   # paid to the last time the page was there
+    assert row["end_reason"] == "sandbox_idle" and row["minutes"] == 2   # counted to the last time the page was there
     assert "running" not in page
 
 
 def test_guests_do_not_see_each_others_machines(box):
     _enter(box)
-    r = box.post("/hosts", data={"name": "Mine Only", "gpu": "RTX 4090", "vram_gb": 24, "price_dollars_per_hour": 0.5})
+    r = box.post("/hosts", data={"name": "Mine Only", "gpu": "RTX 4090", "vram_gb": 24})
     assert "Mine Only" in r.text
     assert "Mine Only" in box.get("/hosts").text and "online" in box.get("/hosts").text
     with TestClient(app) as other:
@@ -143,31 +144,22 @@ def test_guests_do_not_see_each_others_machines(box):
         assert r.headers["location"].startswith("/?model=")   # refused: not a machine this guest can see
 
 
-def test_test_funds_are_fixed_and_capped(box):
-    _enter(box)
-    assert box.post("/store/dev-funds", data={"amount_cents": 99999999}, follow_redirects=False).status_code == 400
-    assert box.post("/store/dev-funds", data={"amount_cents": -1000}, follow_redirects=False).status_code == 400
-    for _ in range(4):
-        assert box.post("/store/dev-funds", data={"amount_cents": 1000}, follow_redirects=False).headers["location"] == "/account"
-    assert box.post("/store/dev-funds", data={"amount_cents": 1000}, follow_redirects=False).headers["location"] == "/store"
-
-
 def test_the_sandbox_wipes_itself_when_it_is_full(box, monkeypatch):
     _enter(box)
-    monkeypatch.setattr(sandbox, "MAX_GUESTS", 1)
+    monkeypatch.setattr(sandbox, "MAX_GUESTS", 0)
     sandbox._last_tick = 0.0
     page = box.get("/").text
     assert "started again" in page
     conn = db.connect("test_app.db")
-    assert conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"] == 1      # only the machines' owner
-    assert conn.execute("SELECT COUNT(*) AS n FROM hosts").fetchone()["n"] == len(sandbox.MACHINES)
+    assert conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"] == 0
+    assert conn.execute("SELECT COUNT(*) AS n FROM hosts").fetchone()["n"] == 0
     conn.close()
 
 
 def test_a_lost_guest_gets_a_new_account_without_a_sign_in_page(box):
     r = box.get("/account", follow_redirects=False)                 # no cookie at all
     assert r.status_code == 303 and r.headers["location"] == "/account" and "orbit_session=" in r.headers["set-cookie"]
-    assert "$10.00" in box.get("/account").text
+    assert "Guest " in box.get("/account").text
     r = box.get("/sessions/999", follow_redirects=False)            # a session from before a restart
     assert r.status_code == 303 and r.headers["location"] == "/"
     assert "started again" in box.get("/").text
@@ -180,4 +172,4 @@ def test_forms_work_behind_a_proxy_that_renames_the_host(box):
     h["origin"] = "https://evil.example"
     assert box.post("/logout", headers=h, follow_redirects=False).status_code == 403
     check = box.get("/sandbox/check", headers={"host": "inner.internal", "x-forwarded-host": "orbit.example"}).json()
-    assert check["sealing_works"] and check["form_check_passes"] and check["machines_online"] == len(sandbox.MACHINES)
+    assert check["sealing_works"] and check["form_check_passes"] and check["simulated_machines_running"] == len(sandbox.MACHINES)

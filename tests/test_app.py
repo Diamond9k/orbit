@@ -26,18 +26,16 @@ def test_full_loop(client):
     r = client.post("/signup", data={"email": "a@b.co", "password": "longenough"}, follow_redirects=False)
     assert r.status_code == 303
     # list a machine and bring it online
-    r = client.post("/hosts", data={"name": "Box", "gpu": "RTX 4090", "vram_gb": 24, "price_dollars_per_hour": 0.60})
+    r = client.post("/hosts", data={"name": "Box", "gpu": "Quadro Zed", "vram_gb": 24})
     assert r.status_code == 200
     import re
     token = re.search(r"<pre[^>]*>(.*?)</pre>", r.text, re.S).group(1).strip()
     assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"session": None}
-    # no money yet: can't start. Friendly redirect back with a message, not an error code.
-    r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
+    # a machine that is not there: a friendly redirect back with a message, not an error code
+    r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 99}, follow_redirects=False)
     assert r.status_code == 303 and "orbit_flash" in r.headers.get("set-cookie", "")
-    page = client.get("/?model=x/Model-7B-Q4_K_M", cookies={"orbit_flash": "You need at least one hour"}).text
-    assert "You need at least one hour" in page
-    # add test funds and start
-    client.post("/store/dev-funds", data={"amount_cents": 1000}, follow_redirects=False)
+    page = client.get("/?model=x/Model-7B-Q4_K_M", cookies={"orbit_flash": "That machine is offline"}).text
+    assert "That machine is offline" in page
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/sessions/1"
     # a second session is refused while one runs, and sends you to the running one
@@ -45,16 +43,56 @@ def test_full_loop(client):
     assert r.status_code == 303 and r.headers["location"] == "/sessions/1"
     page = client.get("/sessions/1", cookies={"orbit_flash": "You already have a session running"}).text
     assert "You already have a session running" in page
-    # the host program says the model is loaded; billing starts now
+    # the host program says the model is loaded; the clock starts now
     assert client.post("/api/hosts/ready", data={"token": token}).status_code == 200
-    # stop: one minute minimum at $0.60/h = 1 cent, host gets 80%, orbit 20%
     r = client.post("/sessions/1/stop", follow_redirects=False)
     assert r.status_code == 303
     page = client.get("/sessions/1").text
     assert "Minutes used" in page and ">ended<" in page
     assert client.get("/health").json()["ok"] is True
     acct = client.get("/account").text
-    assert "$9.99" in acct
+    assert "x/Model-7B-Q4_K_M" in acct and "$" not in acct      # one minute on the record, and no money anywhere
+
+
+def test_nobody_else_can_see_or_use_a_machine(client):
+    token = _start_session(client)
+    client.post("/sessions/1/stop", follow_redirects=False)
+    client.post("/api/hosts/heartbeat", data={"token": token})
+    with TestClient(app) as other:
+        other.post("/signup", data={"email": "o@b.co", "password": "longenough"}, follow_redirects=False)
+        assert "Quadro Zed" not in other.get("/hosts").text and "Quadro Zed" not in other.get("/?model=x/Model-7B-Q4_K_M").text
+        r = other.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
+        assert r.headers["location"].startswith("/?model=")       # refused: not their machine
+    with TestClient(app) as anyone:                                # signed out: a fit table, never a machine
+        page = anyone.get("/?model=x/Model-7B-Q4_K_M").text
+        assert "Will it fit?" in page and "Quadro Zed" not in page
+
+
+def test_an_old_database_with_prices_is_brought_up_to_date(tmp_path):
+    import sqlite3
+    path = str(tmp_path / "old.db")
+    old = sqlite3.connect(path)
+    old.executescript("""
+        CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL UNIQUE, pw_hash BLOB NOT NULL, pw_salt BLOB NOT NULL, created_at TEXT);
+        CREATE TABLE hosts (id INTEGER PRIMARY KEY, owner_id INTEGER NOT NULL, name TEXT NOT NULL, gpu TEXT NOT NULL, vram_gb REAL NOT NULL,
+            price_cents_per_hour INTEGER NOT NULL, token TEXT NOT NULL UNIQUE, status TEXT NOT NULL DEFAULT 'offline', last_seen TEXT, created_at TEXT);
+        CREATE TABLE sessions (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, host_id INTEGER NOT NULL, model TEXT NOT NULL,
+            started_at TEXT, ended_at TEXT, minutes INTEGER, cost_cents INTEGER, ready_at TEXT, end_reason TEXT);
+        CREATE TABLE ledger (id INTEGER PRIMARY KEY, txn_id TEXT, account TEXT, amount_cents INTEGER, memo TEXT, created_at TEXT);
+        INSERT INTO users (email, pw_hash, pw_salt) VALUES ('a@b.co', X'00', X'00');
+        INSERT INTO hosts (owner_id, name, gpu, vram_gb, price_cents_per_hour, token) VALUES (1, 'Box', 'G', 8, 60, 't');
+        INSERT INTO sessions (user_id, host_id, model, minutes, cost_cents) VALUES (1, 1, 'm', 5, 5);
+        INSERT INTO ledger (txn_id, account, amount_cents, memo) VALUES ('x', 'user:1', -5, 'session:1');
+    """)
+    old.commit(); old.close()
+    db.init(path); db.init(path)
+    conn = db.connect(path)
+    assert "price_cents_per_hour" not in {r["name"] for r in conn.execute("PRAGMA table_info(hosts)")}
+    assert "cost_cents" not in {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
+    assert conn.execute("SELECT name, minutes FROM hosts JOIN sessions ON host_id = hosts.id").fetchone()["minutes"] == 5
+    assert conn.execute("SELECT COUNT(*) FROM ledger").fetchone()[0] == 1          # old money rows are history, left alone
+    conn.execute("INSERT INTO hosts (owner_id, name, gpu, vram_gb, token) VALUES (1, 'New', 'G', 8, 'u')")
+    conn.close()
 
 
 def test_hugging_face_url_is_cleaned(client):
@@ -66,7 +104,7 @@ def test_hugging_face_url_is_cleaned(client):
 
 def test_remove_host(client):
     client.post("/signup", data={"email": "h@b.co", "password": "longenough"}, follow_redirects=False)
-    client.post("/hosts", data={"name": "Old", "gpu": "RX 580", "vram_gb": 16, "price_dollars_per_hour": 1})
+    client.post("/hosts", data={"name": "Old", "gpu": "RX 580", "vram_gb": 16})
     assert "Old" in client.get("/hosts").text
     r = client.post("/hosts/1/remove", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/account"
@@ -88,10 +126,9 @@ def test_dotenv_loader_does_not_override(tmp_path, monkeypatch):
 def _start_session(client):
     import re
     client.post("/signup", data={"email": "r@b.co", "password": "longenough"}, follow_redirects=False)
-    r = client.post("/hosts", data={"name": "Box", "gpu": "RTX 4090", "vram_gb": 24, "price_dollars_per_hour": 0.60})
+    r = client.post("/hosts", data={"name": "Box", "gpu": "Quadro Zed", "vram_gb": 24})
     token = re.search(r"<pre[^>]*>(.*?)</pre>", r.text, re.S).group(1).strip()
     client.post("/api/hosts/heartbeat", data={"token": token})
-    client.post("/store/dev-funds", data={"amount_cents": 1000}, follow_redirects=False)
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
     assert r.headers["location"] == "/sessions/1"
     return token
@@ -107,25 +144,23 @@ def test_heartbeat_names_the_session_to_run(client):
     assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"session": None}
 
 
-def test_no_charge_before_machine_is_ready(client):
+def test_the_clock_waits_for_the_machine(client):
     token = _start_session(client)
-    assert "Waiting for the machine. You are not being charged." in client.get("/sessions/1").text
+    assert "<strong>Waiting for the machine.</strong>" in client.get("/sessions/1").text
     assert client.post("/api/hosts/ready", data={"token": "nope"}).status_code == 404
     assert client.post("/api/hosts/ready", data={"token": token}).status_code == 200
     conn = db.connect("test_app.db")
     assert conn.execute("SELECT ready_at FROM sessions WHERE id = 1").fetchone()["ready_at"] is not None
     conn.close()
-    assert "Waiting for the machine" not in client.get("/sessions/1").text
+    assert "<strong>Waiting for the machine.</strong>" not in client.get("/sessions/1").text
 
 
-def test_stop_before_ready_charges_nothing(client):
+def test_stop_before_ready_counts_nothing(client):
     _start_session(client)
     client.post("/sessions/1/stop", follow_redirects=False)
     conn = db.connect("test_app.db")
-    s = conn.execute("SELECT minutes, cost_cents FROM sessions WHERE id = 1").fetchone()
+    assert conn.execute("SELECT minutes FROM sessions WHERE id = 1").fetchone()["minutes"] == 0
     conn.close()
-    assert (s["minutes"], s["cost_cents"]) == (0, 0)
-    assert "$10.00" in client.get("/account").text
     # no running session left, so ready is refused
     assert client.post("/api/hosts/ready", data={"token": "anything"}).status_code == 404
 
@@ -153,7 +188,7 @@ def _stamp(minutes_ago):
 
 
 def _ready_session(client):
-    """A running, ready session: $10.00 of time on a $0.60/h machine, so 1000 minutes are covered."""
+    """A running, ready session."""
     token = _start_session(client)
     assert client.post("/api/hosts/ready", data={"token": token}).status_code == 200
     return token
@@ -161,10 +196,10 @@ def _ready_session(client):
 
 def _session_row(sid=1):
     conn = db.connect("test_app.db")
-    s = conn.execute("SELECT minutes, cost_cents, end_reason FROM sessions WHERE id = ?", (sid,)).fetchone()
+    s = conn.execute("SELECT minutes, end_reason FROM sessions WHERE id = ?", (sid,)).fetchone()
     host = conn.execute("SELECT status FROM hosts WHERE id = 1").fetchone()["status"]
     conn.close()
-    return (s["minutes"], s["cost_cents"], s["end_reason"]), host
+    return (s["minutes"], s["end_reason"]), host
 
 
 def _set(sql, *args):
@@ -173,22 +208,11 @@ def _set(sql, *args):
     conn.close()
 
 
-def test_session_ends_on_its_own_when_time_runs_out(client):
+def test_a_session_runs_as_long_as_the_machine_does(client):
     token = _ready_session(client)
-    _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(1200))  # ran 20 hours, had 1000 minutes
-    page = client.get("/sessions/1").text
-    assert ">ended<" in page and "Your hardware time ran out" in page
-    assert _session_row() == ((1000, 1000, "out_of_time"), "online")
-    assert "$0.00" in client.get("/account").text  # charged exactly what was there, never below zero
-    assert client.get("/health").json()["ok"] is True
-    assert client.post("/api/hosts/heartbeat", data={"token": token}).json() == {"session": None}
-
-
-def test_stopping_late_charges_only_the_time_that_was_covered(client):
-    _ready_session(client)
-    _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(1500))
-    client.post("/sessions/1/stop", follow_redirects=False)
-    assert _session_row() == ((1000, 1000, "out_of_time"), "online")
+    _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(1200))  # twenty hours on your own machine: nothing cuts it off
+    assert ">running<" in client.get("/sessions/1").text.replace('<span class="dot live me-2"></span>', "")
+    assert client.post("/api/hosts/heartbeat", data={"token": token}).json()["session"]["id"] == 1
 
 
 def test_session_ends_when_the_host_stops_answering(client):
@@ -197,46 +221,15 @@ def test_session_ends_when_the_host_stops_answering(client):
     _set("UPDATE hosts SET last_seen = ? WHERE id = 1", _stamp(10))  # silent for 10 minutes
     page = client.get("/sessions/1").text
     assert ">ended<" in page and "The machine stopped answering" in page
-    # charged from ready to the last heartbeat: 2 minutes at $0.60/h is 2 cents, not the 12 minutes since ready
-    assert _session_row() == ((2, 2, "host_lost"), "offline")
-    assert "$9.98" in client.get("/account").text
+    # counted from ready to the last heartbeat: 2 minutes, not the 12 since ready
+    assert _session_row() == ((2, "host_lost"), "offline")
 
 
-def test_lost_host_before_ready_costs_nothing(client):
+def test_lost_host_before_ready_counts_nothing(client):
     _start_session(client)
     _set("UPDATE hosts SET last_seen = ? WHERE id = 1", _stamp(10))
     assert ">ended<" in client.get("/sessions/1").text
-    assert _session_row() == ((0, 0, "host_lost"), "offline")
-    assert "$10.00" in client.get("/account").text
-
-
-def test_a_lost_charge_is_posted_once(client):
-    _ready_session(client)
-    client.post("/sessions/1/stop", follow_redirects=False)
-    conn = db.connect("test_app.db")
-    assert conn.execute("SELECT COUNT(*) FROM ledger WHERE memo = 'session:1'").fetchone()[0] == 3
-    conn.close()
-    # pretend the process died between closing the session and posting the charge, two minutes ago
-    _set("DELETE FROM ledger WHERE memo = 'session:1'")
-    _set("UPDATE sessions SET ended_at = ? WHERE id = 1", _stamp(2))
-    client.get("/account")  # any sweep repairs it
-    client.get("/account")  # and a second sweep does not bill twice
-    conn = db.connect("test_app.db")
-    rows = conn.execute("SELECT account, amount_cents FROM ledger WHERE memo = 'session:1' ORDER BY id").fetchall()
-    conn.close()
-    assert [(r["account"], r["amount_cents"]) for r in rows] == [("user:1", -1), ("host:1", 1), ("orbit:revenue", 0)]
-    assert client.get("/health").json()["ok"] is True
-
-
-def test_affordable_minutes_rounds_like_the_bill():
-    import math
-    from orbit.app import affordable_minutes
-    assert affordable_minutes(1000, 60) == 1000
-    assert affordable_minutes(60, 60) == 60
-    assert affordable_minutes(0, 60) == 0 and affordable_minutes(100, 0) == 0
-    for balance, price in [(1000, 70), (999, 60), (1, 60), (5, 7), (250, 33)]:
-        m = affordable_minutes(balance, price)
-        assert math.ceil(price * m / 60) <= balance < math.ceil(price * (m + 1) / 60)
+    assert _session_row() == ((0, "host_lost"), "offline")
 
 
 def test_chat_is_relayed_and_dropped_with_the_session(client):
@@ -326,4 +319,4 @@ def test_a_held_inbox_request_counts_as_heartbeats(client, monkeypatch):
     last_seen = conn.execute("SELECT last_seen FROM hosts WHERE id = 1").fetchone()[0]
     conn.close()
     assert last_seen >= _stamp(1)
-    assert _session_row()[0][2] is None  # still running
+    assert _session_row()[0][1] is None  # still running

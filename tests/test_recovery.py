@@ -1,10 +1,9 @@
 """Interruption and resumption, with isolated data.
 
 What the code, not the task board, prevents when a piece of Orbit restarts mid-session:
-the clock does not restart, the session is not lost, a repeated stop does not bill twice.
+the clock does not restart, the session is not lost, a repeated stop changes nothing.
 Each test runs against the throwaway database named in tests/conftest.py.
 """
-import math
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -39,12 +38,11 @@ def _stamp(seconds_ago):
 
 
 def _ready_session(client):
-    """Signed up, a machine listed at $0.60 an hour, $10.00 of time, a session started and ready."""
+    """Signed up, a machine added, a session started and ready."""
     client.post("/signup", data={"email": "r@b.co", "password": "longenough"}, follow_redirects=False)
-    r = client.post("/hosts", data={"name": "Box", "gpu": "RTX 4090", "vram_gb": 24, "price_dollars_per_hour": 0.60})
+    r = client.post("/hosts", data={"name": "Box", "gpu": "RTX 4090", "vram_gb": 24})
     token = re.search(r"<pre[^>]*>(.*?)</pre>", r.text, re.S).group(1).strip()
     client.post("/api/hosts/heartbeat", data={"token": token})
-    client.post("/store/dev-funds", data={"amount_cents": 1000}, follow_redirects=False)
     r = client.post("/sessions/start", data={"model": "x/Model-7B-Q4_K_M", "host_id": 1}, follow_redirects=False)
     assert r.headers["location"] == "/sessions/1"
     assert client.post("/api/hosts/ready", data={"token": token}).status_code == 200
@@ -67,7 +65,7 @@ def _set(sql, *args):
 
 def test_a_restarted_host_program_does_not_restart_the_clock(client):
     """The host program crashes and comes back mid-session: it hears the same session in its
-    heartbeat, starts the model again and posts ready again. Billing still runs from the first ready."""
+    heartbeat, starts the model again and posts ready again. The clock still runs from the first ready."""
     token = _ready_session(client)
     first = _stamp(4 * 60 + 30)  # ready four and a half minutes ago
     _set("UPDATE sessions SET ready_at = ? WHERE id = 1", first)
@@ -75,8 +73,8 @@ def test_a_restarted_host_program_does_not_restart_the_clock(client):
     assert client.post("/api/hosts/ready", data={"token": token}).status_code == 200  # ready, again
     assert _query("SELECT ready_at FROM sessions WHERE id = 1")[0]["ready_at"] == first
     client.post("/sessions/1/stop", follow_redirects=False)
-    s = _query("SELECT minutes, cost_cents, end_reason FROM sessions WHERE id = 1")[0]
-    assert (s["minutes"], s["cost_cents"], s["end_reason"]) == (5, 5, "stopped")  # 5 minutes at $0.60 an hour
+    s = _query("SELECT minutes, end_reason FROM sessions WHERE id = 1")[0]
+    assert (s["minutes"], s["end_reason"]) == (5, "stopped")
 
 
 def test_a_restarted_orbit_keeps_the_running_session(client):
@@ -95,17 +93,14 @@ def test_a_restarted_orbit_keeps_the_running_session(client):
     assert _query("SELECT ended_at FROM sessions WHERE id = 1")[0]["ended_at"] is None
 
 
-def test_a_repeated_stop_bills_once(client):
-    """Stop pressed twice, or a retry after a timeout: one charge, the ledger still sums to zero."""
+def test_a_repeated_stop_changes_nothing(client):
+    """Stop pressed twice, or a retry after a timeout: the first stop is the one on the record."""
     _ready_session(client)
     _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(90))
     client.post("/sessions/1/stop", follow_redirects=False)
-    rows_after_first = _query("SELECT account, amount_cents FROM ledger WHERE memo = 'session:1' ORDER BY id")
-    balance_after_first = _query("SELECT COALESCE(SUM(amount_cents), 0) AS b FROM ledger WHERE account = 'user:1'")[0]["b"]
-    assert rows_after_first and sum(r["amount_cents"] for r in rows_after_first) == 0
+    first = [tuple(r) for r in _query("SELECT minutes, ended_at, end_reason FROM sessions WHERE id = 1")]
+    assert first[0][0] == 2 and first[0][2] == "stopped"   # 90 seconds rounds up to 2 minutes
+    _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(900))
     client.post("/sessions/1/stop", follow_redirects=False)
     client.post("/sessions/1/stop", follow_redirects=False)
-    assert _query("SELECT account, amount_cents FROM ledger WHERE memo = 'session:1' ORDER BY id") == rows_after_first
-    assert _query("SELECT COALESCE(SUM(amount_cents), 0) AS b FROM ledger WHERE account = 'user:1'")[0]["b"] == balance_after_first
-    s = _query("SELECT minutes, cost_cents FROM sessions WHERE id = 1")[0]
-    assert (s["minutes"], s["cost_cents"]) == (2, math.ceil(60 * 2 / 60))  # 90 seconds rounds up to 2 minutes
+    assert [tuple(r) for r in _query("SELECT minutes, ended_at, end_reason FROM sessions WHERE id = 1")] == first

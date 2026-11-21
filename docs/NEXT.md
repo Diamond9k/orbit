@@ -8,34 +8,26 @@ The previous builder failed by widening scope, so keep each item to its named fi
 
 
 ## Then
-5. **Verified hosts.** The protected-compute boundary designed in docs/PRIVACY.md: the model runs
-   inside enclave hardware (AMD SEV-SNP or Intel TDX, with NVIDIA confidential computing for the
-   GPU), the host program's session key is born inside it, and the browser checks the attestation
-   and the published measurement before it sends a word. Waits on Cooper: whether to pursue it and
-   who provides the first attested machine. Consumer hardware cannot do this; it stays community.
-6. **The guide.** Reacts to session events, not timers: model loaded, first answer sent, user
-   idle, time running low, session ended. One tip per event, shown once. Answers questions
-   from session data. Never sees the chat.
-7. **Hosts paid, live on the site.** One number from the ledger. The scoreboard.
-8. **Host tiers on the pages.** "Verified" for machines that pass item 5, "community" for everyone
-   else, with the exact wording from docs/PRIVACY.md next to every machine and in every session.
-9. **Host payouts.** Move earned balances to hosts through Stripe. Weekly.
-10. **Stream tokens** through the sealed relay: the host seals partial replies, the page appends them.
+1. **Fingerprint check.** The browser and the host program each show a short code made from
+   the two public keys. Same code on both: the relay did not swap keys. This closes the last
+   privacy gap now that the machine is the person's own. `orbit/static/seal.js`, `host/seal.py`.
+2. **Host program installs like an app** on Windows, Mac and Linux, with plain steps and a
+   download link on the My machines page.
+3. **Stream tokens** through the sealed relay: the machine seals partial replies, the page appends them.
+4. **More than one model at a time**, one per machine. Today a person runs one session at a time.
+5. **Direct browser-to-machine link**, with the relay as fallback, for speed.
 
 ## Later
+- Decide what happens to the swarm and the marketplace documents (see the decision file).
+- Fit check from the Hugging Face file list, and for Apple Silicon and CPU-only machines, not only GPU memory.
 - Store host tokens hashed, not plain, so a copied database cannot impersonate a host.
 - Limit sign-in attempts per email and per address.
 - A second key for sign-in cookies so `ORBIT_SECRET` can be changed without signing everyone out.
 - Continue the competitor scan in docs/SCAN-vastai.md: RunPod, Salad, io.net, Akash. Salad first.
 - Branches review/2026-10-28-1717, -1735, -1856, -1923 and escalate/2026-10-28-1856 are
   swarm attempts at the host program, now merged by hand. Cooper can delete them.
-- Edit a listed machine's price without removing it.
-- Hosts page earnings, real numbers only (rule 5): "most you can earn: $X/hr with every machine
-  busy" from host prices; optional "what you paid" next to earned-so-far from the ledger; after
-  30 days online, measured hours rented and payback at that measured rate. No predicted return.
 - Direct browser-to-host link with the relay as fallback, for speed.
 - Model fit read from the Hugging Face file list, not only the name.
-- A real domain and a small rented box for Orbit once strangers are paying strangers.
 - Host program: if a model server is already answering on its port when it starts (left over
   from a crash), adopt or stop it instead of failing to bind forever.
 - Host program installs like an app (one file, no Python or llama.cpp to set up), and the
@@ -54,6 +46,10 @@ The previous builder failed by widening scope, so keep each item to its named fi
   Add one before the verified tier, when the browser starts checking attestations.
 
 ## Done
+- 2026-11-20, decided by Cooper: self-hosting only, no money (decision file of the same date).
+  Removed the ledger, the store, Stripe, prices and Orbit's cut. A machine is seen and used
+  only by its owner. The sandbox gives each guest simulated machines. CLAUDE.md goal and rules
+  rewritten to match. 89 tests pass.
 - 2026-11-20, asked for by Cooper: public sandbox on Vercel (`ORBIT_SANDBOX=1`, decision file of
   the same date), new look, About page. Closed along the way: the Stripe hook accepted events
   signed with an empty secret; test funds took any amount; a machine name could run script on the

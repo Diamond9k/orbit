@@ -4,49 +4,36 @@
 {% if flash %}<div class="alert alert-warning d-flex align-items-center gap-2"><i class="bi bi-exclamation-circle"></i><div>{{ flash }}</div></div>{% endif %}
 {% set phase = 'ended' if s.ended_at else 'starting' if not s.ready_at else 'running' %}
 <div id="session" data-sid="{{ s.id }}" data-phase="{{ phase }}" data-sandbox="{{ '1' if sandbox else '0' }}"
-     {% if phase == 'running' %}data-ready="{{ ready_epoch }}" data-rate="{{ s.price_cents_per_hour }}" data-balance="{{ balance }}"{% endif %}>
+     {% if phase == 'running' %}data-ready="{{ ready_epoch }}"{% endif %}>
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
   <div class="min-w-0">
     <div class="kicker">Session</div>
     <h1 class="h3 mb-1 text-break">{{ s.model }}</h1>
-    <div class="text-secondary">On <strong class="text-body">{{ s.host_name }}</strong> · {{ s.gpu }} · {{ s.vram_gb | gb }} GB · {{ s.price_cents_per_hour | dollars }} an hour</div>
+    <div class="text-secondary">On <strong class="text-body">{{ s.host_name }}</strong> · {{ s.gpu }} · {{ s.vram_gb | gb }} GB{% if phase == 'running' %} · running for <span id="elapsed" class="text-body">0:00</span>{% endif %}</div>
   </div>
   {% if phase == 'ended' %}<span class="badge text-bg-secondary fs-6">ended</span>{% elif phase == 'starting' %}<span class="badge text-bg-secondary fs-6">starting</span>{% else %}<span class="badge text-bg-success fs-6"><span class="dot live me-2"></span>running</span>{% endif %}
 </div>
 
 {% if phase == 'ended' %}
 <div class="card mb-3"><div class="card-body">
-  <div class="row g-3">
-    <div class="col-4"><div class="text-secondary small">Minutes used</div><div class="stat-n">{{ s.minutes }}</div></div>
-    <div class="col-4"><div class="text-secondary small">You paid</div><div class="stat-n">{{ s.cost_cents | dollars }}</div></div>
-    <div class="col-4"><div class="text-secondary small">Left</div><div class="stat-n">{{ balance | dollars }}</div></div>
-  </div>
-  {% if s.end_reason == 'out_of_time' %}
-  <div class="text-secondary mt-3">Your hardware time ran out, so the session ended on its own. You were charged for the minutes you had.</div>
-  {% elif s.end_reason == 'host_lost' %}
-  <div class="text-secondary mt-3">The machine stopped answering, so the session ended. You were charged only up to the last minute it was reachable.</div>
+  <div class="text-secondary small">Minutes used</div><div class="stat-n">{{ s.minutes }}</div>
+  {% if s.end_reason == 'host_lost' %}
+  <div class="text-secondary mt-3">The machine stopped answering, so the session ended.</div>
   {% elif s.end_reason == 'sandbox_idle' %}
-  <div class="text-secondary mt-3">The session page was closed, so the sandbox ended the session. You were charged up to the last moment the page was open.</div>
+  <div class="text-secondary mt-3">The session page was closed, so the sandbox ended the session.</div>
   {% elif s.end_reason == 'stopped' %}
   <div class="text-secondary mt-3">You stopped it. The conversation ended with the session; Orbit does not keep it.</div>
   {% endif %}
 </div></div>
-<div class="d-flex gap-2"><a class="btn btn-primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="btn btn-outline-light" href="/account">See the ledger</a></div>
+<div class="d-flex gap-2"><a class="btn btn-primary" href="/run?model={{ s.model | urlencode }}">Run it again</a><a class="btn btn-outline-light" href="/account">History</a></div>
 {% elif phase == 'starting' %}
 <div class="card mb-3"><div class="card-body d-flex align-items-center gap-3">
   <div class="spinner-border spinner-border-sm text-secondary" role="status"><span class="visually-hidden">Loading</span></div>
-  <div><strong>Waiting for the machine. You are not being charged.</strong>
-    <div class="text-secondary small">The clock starts when the model is loaded and ready.{% if sandbox %} In the sandbox this takes a few seconds and no model is loaded.{% endif %}</div></div>
+  <div><strong>Waiting for the machine.</strong>
+    <div class="text-secondary small">The model is loading. The first time, the machine downloads it from Hugging Face.{% if sandbox %} In the sandbox this takes a few seconds and no model is loaded.{% endif %}</div></div>
 </div></div>
 <form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-outline-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>
 {% else %}
-<div class="card mb-3"><div class="card-body">
-  <div class="row g-3">
-    <div class="col-4"><div class="text-secondary small">Running for</div><div class="stat-n" id="elapsed">0:00</div></div>
-    <div class="col-4"><div class="text-secondary small">Cost so far</div><div class="stat-n" id="cost">$0.00</div></div>
-    <div class="col-4"><div class="text-secondary small">Time left</div><div class="stat-n" id="left">{{ minutes_left }} min</div></div>
-  </div>
-</div></div>
 <div class="card mb-3"><div class="card-body">
   <div id="chat" class="chat-log mb-3" aria-live="polite"><div id="chat-empty" class="chat-empty">{% if sandbox %}Say anything. The reply is scripted and tells you what happened to your message on the way.{% else %}The model is ready. Say something.{% endif %}</div></div>
   <form id="say" class="d-flex gap-2" autocomplete="off">
@@ -54,8 +41,8 @@
     <button class="btn btn-primary px-4">Send</button>
   </form>
   <div class="d-flex flex-column flex-sm-row align-items-start gap-2 mt-3 small">
-    <span id="seal-state" class="badge text-bg-secondary">Waiting for the host's key</span>
-    <span id="seal-note" class="text-secondary">Orbit relays this conversation and deletes it when the session ends. The host's machine runs the model and can read it.</span>
+    <span id="seal-state" class="badge text-bg-secondary">Waiting for the machine's key</span>
+    <span id="seal-note" class="text-secondary">The relay passes this conversation on and deletes it when the session ends.</span>
   </div>
 </div></div>
 <form method="post" action="/sessions/{{ s.id }}/stop"><button class="btn btn-outline-danger"><i class="bi bi-stop-circle me-1"></i>Stop session</button></form>

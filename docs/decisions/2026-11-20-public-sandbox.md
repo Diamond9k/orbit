@@ -1,5 +1,8 @@
 # A public sandbox on Vercel
 
+> Later the same day Orbit dropped all money (2026-11-20-self-hosting-only.md). The sandbox stays.
+> Read "test funds", "cards" and "Stripe" below as gone: each guest now gets simulated machines.
+
 Date: 2026-11-20. Asked for by Cooper: put Orbit on a Vercel address, sandboxed, so a possible
 co-founder can look at it.
 

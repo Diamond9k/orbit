@@ -1,16 +1,17 @@
-"""Sandbox mode: the whole product loop with nothing real behind it. On with ORBIT_SANDBOX=1.
+"""Sandbox mode: the whole loop with nothing real behind it. On with ORBIT_SANDBOX=1.
 
 Made for a public demo address. In the sandbox:
   - a visitor enters as a guest with one click. No email or password is asked for or kept.
-  - money is test funds only. Stripe is off, whatever keys are set.
-  - machines are simulated. No host program can connect, and no model runs. A simulated host
-    does the real key exchange (host/seal.py) and sends scripted replies that say they are scripted.
-  - a visitor sees the sandbox machines and the ones they listed, never another visitor's text.
+  - each guest gets simulated machines of their own. No host program can connect, and no model
+    runs. A simulated machine does the real key exchange (host/seal.py) and sends scripted
+    replies that say they are scripted.
+  - a guest sees only their own machines, as everywhere in Orbit.
   - the data is thrown away: a session ends when its page is closed, and everything is wiped
     when the store grows past the limits below or the server restarts.
 
-The simulated host's key lives in this process, next to Orbit. So the sandbox shows how the
-sealing works, not the privacy it gives with a real host, and the session page says exactly that.
+The simulated machine's key lives in this process, next to Orbit. So the sandbox shows how the
+sealing works, not the privacy it gives when the machine is your own, and the session page says
+exactly that.
 """
 import importlib.util
 import os
@@ -20,29 +21,24 @@ import threading
 import time
 from pathlib import Path
 
-from . import auth, db, ledger
+from . import auth, db
 
 ENABLED = os.environ.get("ORBIT_SANDBOX") == "1"
 
-SYSTEM_EMAIL = "machines@sandbox.invalid"
-# name, GPU, GPU memory in GB, price in cents per hour. Sandbox numbers, labelled as such on the pages.
+# What a guest starts with: name, GPU, GPU memory in GB. Stand-ins for machines a person might own.
 MACHINES = [
-    ("Sandbox 8 GB", "Radeon RX 580", 8, 15),
-    ("Sandbox 12 GB", "RTX 3060", 12, 25),
-    ("Sandbox 24 GB", "RTX 4090", 24, 60),
-    ("Sandbox 48 GB", "RTX A6000", 48, 110),
+    ("Sandbox workstation", "RTX A6000", 48),
+    ("Sandbox desktop", "RTX 4090", 24),
+    ("Sandbox laptop", "RTX 4060 Laptop", 8),
 ]
-START_FUNDS_CENTS = 1000      # what a guest starts with
-FUNDS_CAP_CENTS = 5000        # no more test funds above this balance
 LOAD_SECONDS = 3              # how long the simulated machine takes to say "ready"
 IDLE_SECONDS = 120            # a session whose page stopped asking is ended after this long
 MAX_GUESTS = 300              # past these, the sandbox is wiped and starts again
 MAX_MESSAGES = 4000
-MAX_MACHINES_PER_GUEST = 3
+MAX_MACHINES_PER_GUEST = 5
 MESSAGE_MAX_CHARS = 12000     # one sealed envelope; about 8000 characters of text
 
 _lock = threading.RLock()
-_system_id: int | None = None
 _last_tick = 0.0
 _hosts: dict[int, dict] = {}  # session id -> the simulated host's sealer and how far it has read
 _seal = None
@@ -60,42 +56,20 @@ def seal():
     return _seal
 
 
-def system_id(conn: sqlite3.Connection) -> int:
-    """The account that owns the sandbox machines. Nobody can sign in to it. Seeds on first use."""
-    global _system_id
-    with _lock:
-        if _system_id is not None:
-            return _system_id
-        row = conn.execute("SELECT id FROM users WHERE email = ?", (SYSTEM_EMAIL,)).fetchone()
-        if row is None:
-            uid = auth.create_user(conn, SYSTEM_EMAIL, secrets.token_urlsafe(32))
-            conn.executemany(
-                "INSERT INTO hosts (owner_id, name, gpu, vram_gb, price_cents_per_hour, token, status, last_seen) "
-                "VALUES (?, ?, ?, ?, ?, ?, 'online', datetime('now'))",
-                [(uid, name, gpu, vram, price, secrets.token_urlsafe(24)) for name, gpu, vram, price in MACHINES])
-        else:
-            uid = int(row["id"])
-        _system_id = uid
-        return uid
-
-
 def reset(conn: sqlite3.Connection) -> None:
     """Throw everything away and start again."""
-    global _system_id
     with _lock:
         with db.tx(conn):
-            for table in ("messages", "sessions", "hosts", "ledger", "users"):
+            for table in ("messages", "sessions", "hosts", "users"):
                 conn.execute(f"DELETE FROM {table}")
-        _system_id = None
         _hosts.clear()
-        system_id(conn)
 
 
 def tick(conn: sqlite3.Connection, end_session) -> None:
     """Keep the sandbox running. Called on every request; does its work at most once a second.
 
-    `end_session` is the app's own function, so a sandbox session is closed and charged by the
-    same code as a real one.
+    `end_session` is the app's own function, so a sandbox session is closed by the same code
+    as a real one.
     """
     global _last_tick
     with _lock:
@@ -107,13 +81,12 @@ def tick(conn: sqlite3.Connection, end_session) -> None:
         messages = conn.execute("SELECT COUNT(*) AS n FROM messages").fetchone()["n"]
         if guests > MAX_GUESTS or messages > MAX_MESSAGES:
             reset(conn)
-        system_id(conn)
         # Every machine here is simulated, so a free one is always online.
         conn.execute("UPDATE hosts SET status = 'online', last_seen = datetime('now') WHERE status IN ('offline', 'online')")
         # A busy machine is kept alive only while its session page keeps asking (see step). When the
-        # page is closed the session ends, charged up to the last time the page was there.
+        # page is closed the session ends, counted up to the last time the page was there.
         idle = conn.execute(
-            "SELECT s.*, h.price_cents_per_hour, h.last_seen FROM sessions s JOIN hosts h ON h.id = s.host_id "
+            "SELECT s.*, h.last_seen FROM sessions s JOIN hosts h ON h.id = s.host_id "
             "WHERE s.ended_at IS NULL AND COALESCE(h.last_seen, s.started_at) < datetime('now', ?)",
             (f"-{IDLE_SECONDS} seconds",)).fetchall()
         for s in idle:
@@ -130,17 +103,13 @@ def _stamp(last_seen: str, ready_at: str | None):
 
 
 def enter(conn: sqlite3.Connection) -> int:
-    """A new guest with test funds. Returns the user id."""
-    system_id(conn)
+    """A new guest with simulated machines of their own. Returns the user id."""
     name = f"guest-{secrets.token_hex(4)}@sandbox.invalid"
     uid = auth.create_user(conn, name, secrets.token_urlsafe(32))  # the password is thrown away: a guest cannot sign in again
-    ledger.post(conn, [("dev:faucet", -START_FUNDS_CENTS), (f"user:{uid}", START_FUNDS_CENTS)], memo="sandbox test funds")
+    conn.executemany(
+        "INSERT INTO hosts (owner_id, name, gpu, vram_gb, token, status, last_seen) VALUES (?, ?, ?, ?, ?, 'online', datetime('now'))",
+        [(uid, machine, gpu, vram, secrets.token_urlsafe(24)) for machine, gpu, vram in MACHINES])
     return uid
-
-
-def scope(conn: sqlite3.Connection, user) -> tuple[str, tuple]:
-    """SQL for the machines a visitor may see: the sandbox machines and their own."""
-    return "(owner_id = ? OR owner_id = ?)", (system_id(conn), user["id"] if user else -1)
 
 
 def step(conn: sqlite3.Connection, sid: int) -> None:
@@ -168,7 +137,7 @@ def step(conn: sqlite3.Connection, sid: int) -> None:
                 _hosts.clear()
             last = conn.execute("SELECT COALESCE(MAX(id), 0) AS m FROM messages WHERE session_id = ?", (sid,)).fetchone()["m"]
             st = _hosts[sid] = {"sealer": seal().Sealer(sid, "host"), "after": last, "answered": 0}
-            _say(conn, sid, st["sealer"].hello({"kind": "none", "note": "sandbox: simulated host"}))
+            _say(conn, sid, st["sealer"].hello({"kind": "none", "note": "sandbox: simulated machine"}))
         sealer = st["sealer"]
         rows = conn.execute("SELECT id, body FROM messages WHERE session_id = ? AND sender = 'user' AND id > ? ORDER BY id",
                             (sid, st["after"])).fetchall()
@@ -187,9 +156,9 @@ def step(conn: sqlite3.Connection, sid: int) -> None:
                     st["answered"] += 1
                     _say(conn, sid, _reply(s["model"], len(r["body"].split()), len(r["body"]), st["answered"], False))
             except seal().SealError:
-                # An envelope this host cannot open (a key from another tab, or out of order). A real host
+                # An envelope this machine cannot open (a key from another tab, or out of order). A real host
                 # program answers the same way: a plain notice, and it stays sealed.
-                _say(conn, sid, "The simulated host could not open that message. Reload the page and send it again.")
+                _say(conn, sid, "The simulated machine could not open that message. Reload the page and send it again.")
 
 
 def _say(conn: sqlite3.Connection, sid: int, body: str) -> None:
@@ -197,17 +166,17 @@ def _say(conn: sqlite3.Connection, sid: int, body: str) -> None:
 
 
 def _reply(model: str, words: int, envelope_chars: int, n: int, sealed: bool) -> str:
-    """What the simulated host says. Every sentence must be exactly true (rule 5)."""
+    """What the simulated machine says. Every sentence must be exactly true."""
     word = "word" if words == 1 else "words"
     if not sealed:
         return (f"Scripted reply {n}. No model runs in the sandbox. Your message of {words} {word} "
-                "arrived unsealed, so Orbit could read it.")
+                "arrived unsealed, so the relay could read it.")
     if n == 1:
         return ("This is a scripted reply. No model runs in the sandbox.\n\n"
                 "What happened to your message: your browser sealed it with a key made for this session. "
-                f"Orbit stored and passed on an envelope of {envelope_chars} characters. The simulated host "
-                f"opened it and counted {words} {word}. This reply came back to you sealed the same way.\n\n"
-                f"With a real host, {model} runs on the host's machine and answers here. The host's key "
-                "stays on that machine, so Orbit relays envelopes it cannot open.")
+                f"The relay stored and passed on an envelope of {envelope_chars} characters. The simulated "
+                f"machine opened it and counted {words} {word}. This reply came back to you sealed the same way.\n\n"
+                f"On your own machine, {model} runs there and answers here. The key stays on that machine, "
+                "so the only computer that reads your words is yours.")
     return (f"Scripted reply {n}. Envelope of {envelope_chars} characters in, {words} {word} read by the "
-            "simulated host, reply sealed on the way back. No model wrote this.")
+            "simulated machine, reply sealed on the way back. No model wrote this.")
