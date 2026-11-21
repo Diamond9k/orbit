@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#07080d">
+<meta name="description" content="Orbit: run any open source AI model on a computer you own and use it from any browser. Free and open source. No fees.">
 <title>{% block title %}Orbit{% endblock %}</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/vendor/bootstrap.min.css">
@@ -10,10 +13,12 @@
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="d-flex flex-column min-vh-100">
+<div class="aura" aria-hidden="true"><i></i><i></i><i></i></div>
+<a class="visually-hidden-focusable skip" href="#main">Skip to the page</a>
 <nav class="navbar navbar-expand-md sticky-top">
   <div class="container">
     <a class="navbar-brand fw-bold d-flex align-items-center gap-2" href="/">
-      <svg class="text-primary" width="24" height="24" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" aria-hidden="true">
+      <svg class="brand-mark" width="26" height="26" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" aria-hidden="true">
         <path d="M 82.68 40.63 A 34 34 0 1 1 64.91 19.44"/><circle cx="76.04" cy="28.15" r="6"/>
       </svg> Orbit
     </a>
@@ -22,15 +27,17 @@
     </button>
     <div class="collapse navbar-collapse" id="nav">
       <ul class="navbar-nav me-auto">
-        <li class="nav-item"><a class="nav-link" href="/">Run a model</a></li>
-        <li class="nav-item"><a class="nav-link" href="/hosts">Hosts</a></li>
+        <li class="nav-item"><a class="nav-link" href="/run">Run a model</a></li>
+        <li class="nav-item"><a class="nav-link" href="/hosts">My machines</a></li>
+        <li class="nav-item"><a class="nav-link" href="/about">About</a></li>
       </ul>
       <ul class="navbar-nav align-items-md-center gap-2">
         {% if user %}
-          {% if nav_active %}<li class="nav-item"><a class="btn btn-success btn-sm" href="/sessions/{{ nav_active.id }}"><i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Session on {{ nav_active.host_name }}</a></li>{% endif %}
-          <li class="nav-item"><a class="nav-link" href="/store" title="Add time"><strong class="text-body">{{ nav_balance | dollars }}</strong> <i class="bi bi-plus-circle ms-1"></i></a></li>
-          <li class="nav-item"><a class="nav-link" href="/account"><i class="bi bi-person-circle me-1"></i>Account</a></li>
-          <li class="nav-item"><form method="post" action="/logout"><button class="btn btn-outline-light btn-sm">Sign out</button></form></li>
+          {% if nav_active %}<li class="nav-item"><a class="btn btn-success btn-sm" href="/sessions/{{ nav_active.id }}"><span class="dot live me-2"></span>Session on {{ nav_active.host_name }}</a></li>{% endif %}
+          <li class="nav-item"><a class="nav-link" href="/account"><i class="bi bi-person-circle me-1"></i>{{ 'Guest' if sandbox else 'Account' }}</a></li>
+          <li class="nav-item"><form method="post" action="/logout"><button class="btn btn-outline-light btn-sm">{{ 'Leave' if sandbox else 'Sign out' }}</button></form></li>
+        {% elif sandbox %}
+          <li class="nav-item"><form method="post" action="/sandbox/enter"><button class="btn btn-primary" data-busy="Opening…">Try it</button></form></li>
         {% else %}
           <li class="nav-item"><a class="nav-link" href="/login">Sign in</a></li>
           <li class="nav-item"><a class="btn btn-primary" href="/signup">Get started</a></li>
@@ -39,8 +46,11 @@
     </div>
   </div>
 </nav>
+{% if sandbox %}
+<div class="ribbon"><div class="container"><span class="ribbon-tag">Sandbox</span> Simulated machines. Scripted replies. Nothing is kept.</div></div>
+{% endif %}
 
-<main class="flex-grow-1">
+<main class="flex-grow-1" id="main">
   <div class="container py-4">
   {% block body %}{% endblock %}
   </div>
@@ -48,17 +58,18 @@
 
 <footer class="py-4 mt-5">
   <div class="container d-flex flex-column flex-md-row justify-content-between gap-3 text-secondary small">
-    <div>
+    <div class="foot-about">
       <div class="fw-semibold text-body">Orbit</div>
-      Orbit holds a list of machines and a ledger. Models run on hosts' machines, not here.
-      {% if dev %}<div class="text-warning mt-2">Development mode is on. Test funds are enabled.</div>{% endif %}
+      Free. Open source. Your machines only.
     </div>
-    <div class="d-flex gap-4">
-      <div><div class="fw-semibold text-body mb-1">Use</div><a class="d-block link-secondary" href="/run">Run a model</a><a class="d-block link-secondary" href="/store">Add time</a></div>
-      <div><div class="fw-semibold text-body mb-1">Host</div><a class="d-block link-secondary" href="/hosts">List a machine</a></div>
+    <div class="d-flex gap-4 flex-wrap">
+      <div><div class="fw-semibold text-body mb-1">Use</div><a class="d-block link-secondary" href="/run">Run a model</a><a class="d-block link-secondary" href="/hosts">My machines</a></div>
+      <div><div class="fw-semibold text-body mb-1">Project</div><a class="d-block link-secondary" href="/about">About</a><a class="d-block link-secondary" href="{{ repo_url }}" rel="noopener">Source code</a></div>
     </div>
   </div>
 </footer>
 <script src="/static/vendor/bootstrap.bundle.min.js"></script>
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

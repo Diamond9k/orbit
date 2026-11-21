@@ -1,3 +1,6 @@
+> Note, 2026-11-20: the goal the swarm builds toward is now the one in CLAUDE.md: free self-hosting.
+> The scoreboard counts use, not money. Read "hosts paid" below as that.
+
 # The swarm
 
 Agents that build Orbit toward the goal in CLAUDE.md, on your own PC, without turning off.

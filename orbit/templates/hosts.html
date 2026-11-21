@@ -1,44 +1,57 @@
 {% extends "base.html" %}
-{% block title %}Hosts · Orbit{% endblock %}
+{% block title %}My machines · Orbit{% endblock %}
 {% block body %}
 <div class="row g-4">
   <div class="col-lg-7">
-    <h1 class="h2 mb-1">Machines</h1>
-    <p class="text-secondary">Every machine listed on Orbit. Hosts set their own price.</p>
-    <div class="card">
-      {% if hosts %}
-      <div class="table-responsive"><table class="table mb-0 align-middle">
-        <thead><tr><th>Name</th><th>GPU</th><th>Memory</th><th>Price / hour</th><th>Status</th></tr></thead>
-        <tbody>{% for h in hosts %}
-        <tr><td class="fw-semibold">{{ h.name }}</td><td>{{ h.gpu }}</td><td>{{ h.vram_gb }} GB</td><td>{{ h.price_cents_per_hour | dollars }}</td>
-            <td><span class="badge {{ 'text-bg-success' if h.status == 'online' else 'text-bg-warning' if h.status == 'busy' else 'text-bg-secondary' }}">{{ h.status }}</span></td></tr>
-        {% endfor %}</tbody></table></div>
-      {% else %}<div class="card-body text-secondary">No machines listed yet.</div>{% endif %}
+    <h1 class="h2 mb-3">My machines</h1>
+    {% if hosts %}
+    <div class="d-grid gap-3">
+      {% for h in hosts %}
+      <div class="card"><div class="card-body machine-row">
+        <svg class="glyph {{ 'running' if h.status == 'busy' else 'idle' if h.status == 'online' else 'ended' }}" width="44" height="44" viewBox="-26 -26 52 52" aria-hidden="true"><circle class="lane" r="17"/><circle class="glow g1" r="11"/><circle class="sun" r="6.5"/></svg>
+        <div class="grow"><div class="fw-bold">{{ h.name }}</div>
+          <div class="small text-secondary">{{ h.gpu }} · {{ h.vram_gb | gb }} GB · <span class="{{ 'text-success' if h.status == 'online' else 'text-warning' if h.status == 'busy' else '' }}">{{ 'running a model' if h.status == 'busy' else h.status }}</span></div></div>
+        <form method="post" action="/hosts/{{ h.id }}/remove" data-confirm="Remove {{ h.name }}?"><button class="btn btn-sm btn-outline-danger" {{ 'disabled' if h.status == 'busy' }}>Remove</button></form>
+      </div></div>
+      {% endfor %}
     </div>
+    {% elif user %}<div class="card"><div class="card-body text-secondary">No machine yet.</div></div>
+    {% else %}<div class="card"><div class="card-body text-secondary">{{ 'Tap "Try it" to get three simulated machines.' if sandbox else 'Sign in to see your machines.' }}</div></div>{% endif %}
+    <p class="text-secondary small mt-3">Only you see them. Only you can use them.</p>
   </div>
 
   <div class="col-lg-5">
     <div class="card"><div class="card-body p-4">
-      <h2 class="h4 mb-1">List your machine</h2>
-      <p class="text-secondary">You are paid for every hour it is used. Nothing for listing it.</p>
+      <h2 class="h4 mb-3">Add a machine</h2>
       {% if new_token %}
-      <div class="alert alert-success"><div class="fw-semibold mb-1">Listed.</div>Your host token is below. The host program uses it to connect. Keep it private.<pre class="mt-2 mb-0">{{ new_token }}</pre></div>
+      <div class="alert alert-success"><div class="fw-semibold mb-1">Added.</div>
+        {% if sandbox %}Simulated, so it is online now. A real host program would use this token:
+        {% else %}Your token. Keep it private. It is shown once.{% endif %}
+        <pre class="token mt-2 mb-2" id="token">{{ new_token }}</pre>
+        <button type="button" class="btn btn-sm btn-outline-light" data-copy="#token">Copy</button></div>
       {% endif %}
       {% if user %}
       {% if error %}<div class="alert alert-danger py-2">{{ error }}</div>{% endif %}
       <form method="post" action="/hosts">
-        <div class="mb-3"><label class="form-label" for="name">Name</label><input class="form-control" id="name" name="name" required placeholder="e.g. Cooper's desktop"></div>
-        <div class="mb-3"><label class="form-label" for="gpu">GPU</label><input class="form-control" id="gpu" name="gpu" required placeholder="e.g. RTX 4090"></div>
+        <div class="mb-3"><label class="form-label" for="name">Name</label><input class="form-control form-control-lg" id="name" name="name" required maxlength="60" placeholder="Desk PC"></div>
         <div class="row g-3 mb-3">
-          <div class="col"><label class="form-label" for="vram">GPU memory (GB)</label><input class="form-control" id="vram" name="vram_gb" type="number" step="0.5" min="1" required></div>
-          <div class="col"><label class="form-label" for="price">Price per hour ($)</label><input class="form-control" id="price" name="price_dollars_per_hour" type="number" step="0.05" min="0.05" required></div>
+          <div class="col-7"><label class="form-label" for="gpu">GPU</label><input class="form-control form-control-lg" id="gpu" name="gpu" required maxlength="60" placeholder="RTX 4090"></div>
+          <div class="col-5"><label class="form-label" for="vram">Memory (GB)</label><input class="form-control form-control-lg" id="vram" name="vram_gb" type="number" step="0.5" min="1" max="2048" required inputmode="decimal" placeholder="24"></div>
         </div>
-        <button class="btn btn-primary w-100">List it</button>
+        <button class="btn btn-primary btn-lg w-100">Add</button>
       </form>
+      {% elif sandbox %}
+      <form method="post" action="/sandbox/enter"><button class="btn btn-primary btn-lg w-100" data-busy="Opening…">Try it now</button></form>
       {% else %}
-      <a class="btn btn-primary w-100" href="/signup">Get started to list a machine</a>
+      <a class="btn btn-primary btn-lg w-100" href="/signup">Get started</a>
       {% endif %}
     </div></div>
+    <details class="fold mt-3"><summary>How does a real machine join?</summary><div class="inside">
+      <ol class="ps-3 steps small mb-0">
+        <li>Add it here. You get a private token.</li>
+        <li>Run the host program on it with the token. It only dials out, so your router needs no changes.</li>
+        <li>Start a model from any browser.</li>
+      </ol></div></details>
   </div>
 </div>
 {% endblock %}

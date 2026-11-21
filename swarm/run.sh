@@ -29,7 +29,7 @@ DIRECTOR_MODEL="${DIRECTOR_MODEL:-claude-opus-5-5}"
 CRITIC_MODEL="${CRITIC_MODEL:-claude-opus-5-5}"
 STRANGER_MODEL="${STRANGER_MODEL:-local}"
 SENSITIVE='^(orbit/app\.py|orbit/db\.py|host/|orbit/templates/session\.html)'
-PROTECTED='^(requirements.*\.txt|CLAUDE\.md|\.github/|swarm/|prompts/|\.aider\.conf\.yml|orbit/ledger\.py|docs/KEYSTONE\.md|docs/decisions/|\.claude/)'
+PROTECTED='^(requirements.*\.txt|CLAUDE\.md|\.github/|swarm/|prompts/|\.aider\.conf\.yml|docs/KEYSTONE\.md|docs/decisions/|\.claude/)'
 AIDER_TIMEOUT="${AIDER_TIMEOUT:-2400}"  # seconds one builder, fixer or critic call may take before the cycle moves on
 
 if ! curl -s -o /dev/null http://127.0.0.1:8080/v1/models; then

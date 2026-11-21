@@ -8,8 +8,8 @@ It only dials out, so it works behind a home router with nothing to configure.
 
 Every few seconds it sends a heartbeat. When Orbit's reply names a session, it starts
 llama.cpp's server for that model (which downloads the GGUF from Hugging Face the first
-time), waits until the server answers, then tells Orbit the machine is ready. Billing
-starts only then. While the session runs it asks Orbit for the user's messages, puts each
+time), waits until the server answers, then tells Orbit the machine is ready. The session's
+clock starts only then. While the session runs it asks Orbit for the user's messages, puts each
 one to the model, and posts the answer back. When the session ends, it stops the server.
 
 Once the machine is ready it offers the browser a key, and from then on the conversation is

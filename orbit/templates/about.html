@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}How it works · Orbit{% endblock %}
+{% block body %}
+<section class="hero hero-sm text-center">
+  <h1 class="display-5 wide mx-auto mb-4"><span class="nb">Your model.</span> <span class="nb">Your machine.</span> <span class="nb">Your words.</span></h1>
+  {{ scene.path() }}
+</section>
+
+<div class="facts mb-5">
+  <div class="fact"><i class="bi bi-heart role-ico"></i><div><b>Free</b><span>No fee. No ads. No paid tier.</span></div></div>
+  <div class="fact"><i class="bi bi-gpu-card role-ico"></i><div><b>Self-hosted</b><span>Your machines only. Nothing is rented.</span></div></div>
+  <div class="fact"><i class="bi bi-github role-ico"></i><div><b>Open source</b><span>Read it. Run it yourself.</span></div></div>
+</div>
+
+<details class="fold"><summary>Why is it free?</summary><div class="inside">
+  <p>People self-host to stop paying for something that runs on their own machine, and to keep their data. A fee would contradict that. Orbit is a passion project, not a business.</p></div></details>
+
+<details class="fold"><summary>What can the relay see?</summary><div class="inside">
+  <p>The relay passes messages between your browser and your machine. It sees a sealed envelope: its size and its time. It also sees which model you ran and for how long. It deletes the envelopes when the session ends.</p>
+  <p><strong class="text-body">One gap is open.</strong> Both keys travel through the relay, so a dishonest relay could swap them. Nothing checks for that yet. Run the relay yourself to close the gap today. A fingerprint check is next.</p></div></details>
+
+<details class="fold"><summary>What works today?</summary><div class="inside">
+  <ul class="ticks">
+    <li>The fit check, from a Hugging Face name or link.</li>
+    <li>The host program: it runs the model with llama.cpp and only dials out.</li>
+    <li>Sealed chat from any browser: ECDH P-256, HKDF, AES-256-GCM.</li>
+    <li>The full loop ran on real hardware: a Radeon RX 580 with 8 GB.</li>
+  </ul></div></details>
+
+<details class="fold"><summary>What is next?</summary><div class="inside">
+  <ol class="rules">
+    <li><strong>Fingerprint check,</strong> so a relay cannot swap keys unseen.</li>
+    <li><strong>Host program that installs like an app.</strong></li>
+    <li><strong>Streamed replies.</strong></li>
+    <li><strong>More than one model at a time.</strong></li>
+  </ol>
+  <p><a href="{{ repo_url }}/blob/main/docs/NEXT.md" rel="noopener">The full list</a></p></div></details>
+
+<details class="fold"><summary>How do I run it myself?</summary><div class="inside">
+<pre class="code">git clone {{ repo_url }}.git
+cd orbit
+python3 -m pip install -r requirements.txt
+python3 -m orbit</pre>
+  <p>Then open http://localhost:8000. Python, FastAPI, SQLite. No build step.</p>
+  <ul class="links">
+    <li><a href="{{ repo_url }}" rel="noopener"><i class="bi bi-github me-2"></i>Source code</a></li>
+    <li><a href="{{ repo_url }}/blob/main/CLAUDE.md" rel="noopener">The goal and the rules</a></li>
+    <li><a href="{{ repo_url }}/tree/main/docs/decisions" rel="noopener">Decisions</a></li>
+  </ul></div></details>
+
+{% if sandbox %}
+<details class="fold"><summary>What is this sandbox?</summary><div class="inside">
+  <p>The real Orbit code with simulated machines. No model runs, and replies are scripted. The simulated machine runs on the relay's own server, so the sandbox shows how sealing works, not the privacy of your own machine. You enter as a guest. Nothing is kept.</p></div></details>
+<div class="text-center mt-4">
+  {% if not user %}<form method="post" action="/sandbox/enter"><button class="btn btn-primary btn-lg" data-busy="Opening…">Try it now</button></form>{% else %}<a class="btn btn-primary btn-lg" href="/run">Run a model</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

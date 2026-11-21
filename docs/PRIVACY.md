@@ -1,5 +1,10 @@
 # Privacy: what Orbit protects, from whom, and how we know
 
+> Note, 2026-11-20: Orbit is now self-hosting only (docs/decisions/2026-11-20-self-hosting-only.md).
+> The host is the user, so the column "The user's own machine" is the one that applies, plus the
+> key-swap gap below for a relay run by someone else. The rest of this file is the record of the
+> marketplace design and is kept as history.
+
 Owner's goal, stated by Cooper on 2026-10-29: protect the user's prompts, answers and session
 state from both Orbit and the hardware owner. Encryption between the browser and the host is one
 necessary piece, not the finished solution.

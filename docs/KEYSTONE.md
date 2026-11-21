@@ -1,3 +1,6 @@
+> History. This file describes Orbit as a GPU marketplace. That was dropped on 2026-11-20:
+> Orbit is now free and self-hosting only (docs/decisions/2026-11-20-self-hosting-only.md).
+
 # Keystone
 
 Keystone is the director of Orbit. Cooper named it for the piece that holds an arch together:
