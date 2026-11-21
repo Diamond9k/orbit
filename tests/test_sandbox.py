@@ -162,3 +162,22 @@ def test_the_sandbox_wipes_itself_when_it_is_full(box, monkeypatch):
     assert conn.execute("SELECT COUNT(*) AS n FROM users").fetchone()["n"] == 1      # only the machines' owner
     assert conn.execute("SELECT COUNT(*) AS n FROM hosts").fetchone()["n"] == len(sandbox.MACHINES)
     conn.close()
+
+
+def test_a_lost_guest_gets_a_new_account_without_a_sign_in_page(box):
+    r = box.get("/account", follow_redirects=False)                 # no cookie at all
+    assert r.status_code == 303 and r.headers["location"] == "/account" and "orbit_session=" in r.headers["set-cookie"]
+    assert "$10.00" in box.get("/account").text
+    r = box.get("/sessions/999", follow_redirects=False)            # a session from before a restart
+    assert r.status_code == 303 and r.headers["location"] == "/"
+    assert "started again" in box.get("/").text
+    assert box.get("/sessions/999/messages").status_code == 404     # the page script reloads on this
+
+
+def test_forms_work_behind_a_proxy_that_renames_the_host(box):
+    h = {"host": "inner.internal", "x-forwarded-host": "orbit.example", "origin": "https://orbit.example"}
+    assert box.post("/sandbox/enter", headers=h, follow_redirects=False).status_code == 303
+    h["origin"] = "https://evil.example"
+    assert box.post("/logout", headers=h, follow_redirects=False).status_code == 403
+    check = box.get("/sandbox/check", headers={"host": "inner.internal", "x-forwarded-host": "orbit.example"}).json()
+    assert check["sealing_works"] and check["form_check_passes"] and check["machines_online"] == len(sandbox.MACHINES)

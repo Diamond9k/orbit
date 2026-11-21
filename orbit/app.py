@@ -93,7 +93,20 @@ def _foreign(request: Request) -> bool:
     source = request.headers.get("origin") or request.headers.get("referer")
     if not source or source == "null":
         return source == "null"
-    return urlsplit(source).netloc.lower() != request.headers.get("host", "").lower()
+    return urlsplit(source).netloc.lower() not in own_hosts(request)
+
+
+def own_hosts(request: Request) -> set[str]:
+    """Every name this server answers to, as a browser would write it.
+
+    Behind a proxy the Host header can be the proxy's inner name, with the public name in
+    X-Forwarded-Host. Vercel also tells the app its own addresses. A name here was set by the
+    server or its proxy, never by the page that sent the form.
+    """
+    names = {request.headers.get("host", ""), urlsplit(BASE_URL).netloc}
+    names.update(h.strip() for h in request.headers.get("x-forwarded-host", "").split(","))
+    names.update(os.environ.get(k, "") for k in ("VERCEL_URL", "VERCEL_BRANCH_URL", "VERCEL_PROJECT_PRODUCTION_URL"))
+    return {n.lower() for n in names if n}
 
 
 @app.middleware("http")
@@ -102,8 +115,12 @@ async def protect(request: Request, call_next):
     # A form or fetch from another site must not act as the signed-in person. The cookie is
     # SameSite=Lax already; this is the second lock.
     if request.method not in ("GET", "HEAD", "OPTIONS") and not path.startswith(MACHINE_PATHS) and _foreign(request):
+        print(f"refused cross-site {request.method} {path}: origin={request.headers.get('origin')!r} "
+              f"host={request.headers.get('host')!r} forwarded={request.headers.get('x-forwarded-host')!r}", flush=True)
         return JSONResponse({"detail": "this request came from another site"}, status_code=403)
     resp = await call_next(request)
+    if resp.status_code >= 400 and not path.startswith("/static/"):
+        print(f"{resp.status_code} {request.method} {path}", flush=True)  # the path only: no query, no names
     h = resp.headers
     h.setdefault("Content-Security-Policy", CSP)
     h.setdefault("X-Content-Type-Options", "nosniff")
@@ -133,9 +150,16 @@ def current_user(request: Request, conn: sqlite3.Connection = Depends(get_db)):
     return conn.execute("SELECT id, email FROM users WHERE id = ?", (uid,)).fetchone()
 
 
-def require_user(user=Depends(current_user)):
+def require_user(request: Request, user=Depends(current_user), conn: sqlite3.Connection = Depends(get_db)):
     if user is None:
-        raise HTTPException(status_code=303, headers={"Location": "/login"})
+        if SANDBOX and request.method == "GET":
+            # The sandbox has no sign-in page. Whoever opens a page that needs an account gets a
+            # guest account on the spot, also after a wipe or a restart took the old one.
+            resp = RedirectResponse(request.url.path if request.url.path in ("/account", "/store") else "/", status_code=303)
+            sign_in(request, resp, sandbox.enter(conn))
+            raise HTTPException(status_code=303, headers={k: v for k, v in resp.headers.items()
+                                                          if k.lower() in ("location", "set-cookie")})
+        raise HTTPException(status_code=303, headers={"Location": "/" if SANDBOX else "/login"})
     return user
 
 
@@ -224,6 +248,24 @@ def sandbox_enter(request: Request, user=Depends(current_user), conn=Depends(get
 
 def sandbox_example() -> str:
     return "bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M"
+
+
+@app.get("/sandbox/check")
+def sandbox_check(request: Request, conn=Depends(get_db)):
+    """Proves the sandbox can do its job where it is deployed. Shows no secret and no person."""
+    if not SANDBOX:
+        raise HTTPException(404)
+    seal = sandbox.seal()
+    host, guest = seal.Sealer(1, "host"), seal.Sealer(1, "user")
+    guest.accept(host.hello()); host.accept(guest.hello())
+    public = (request.headers.get("x-forwarded-host") or request.headers.get("host", "")).split(",")[0].strip()
+    with db.tx(conn):
+        machines = conn.execute("SELECT COUNT(*) AS n FROM hosts WHERE owner_id = ? AND status = 'online'",
+                                (sandbox.system_id(conn),)).fetchone()["n"]
+    return {"sealing_works": host.unseal(guest.seal("ping")) == "ping", "machines_online": machines,
+            "database_writable": True, "books_balance": not ledger.verify(conn),
+            "forms_accepted_from": public, "form_check_passes": public.lower() in own_hosts(request),
+            "https": is_https(request)}
 
 
 @app.get("/about", response_class=HTMLResponse)
@@ -457,6 +499,8 @@ def session_page(request: Request, sid: int, user=Depends(require_user), conn=De
         (sid, user["id"]),
     ).fetchone()
     if s is None:
+        if SANDBOX:  # the session went with a wipe or a restart
+            raise UserError("The sandbox started again and that session went with it. Start a new one.", "/")
         raise HTTPException(404)
     balance = ledger.balance(conn, f"user:{user['id']}")
     minutes_left = affordable_minutes(balance, s["price_cents_per_hour"])

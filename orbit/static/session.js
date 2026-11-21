@@ -10,7 +10,7 @@
     // Ask until the machine says ready (or the session ends), then show the running page.
     (function wait() {
       fetch('/sessions/' + sid + '/messages?after=0&wait=10', {credentials: 'same-origin'})
-        .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(function (r) { if (r.status === 404) { location.reload(); return {}; } if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(function (d) { if (d.ready || d.ended) location.reload(); else setTimeout(wait, 300); })
         .catch(function () { setTimeout(wait, 3000); });
     })();
@@ -107,6 +107,7 @@
   async function poll() {
     try {
       var r = await fetch('/sessions/' + sid + '/messages?after=' + after + '&wait=15', {credentials: 'same-origin'});
+      if (r.status === 404) { location.reload(); return; }  // the session is gone: the page will say why
       if (!r.ok) throw new Error(r.status);
       var d = await r.json();
       for (var i = 0; i < d.messages.length; i++) await show(d.messages[i]);
