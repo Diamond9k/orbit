@@ -58,7 +58,7 @@ def client_plain():
 
 def test_a_guest_enters_with_machines_and_no_details(box):
     page = box.get("/").text
-    assert "Try it in the sandbox" in page and "Sandbox" in page
+    assert "Try it now" in page and "Sandbox" in page
     _enter(box)
     acct = box.get("/account").text
     assert "Guest " in acct and "@sandbox.invalid" not in acct and "$" not in acct
@@ -97,7 +97,7 @@ def test_the_simulated_host_seals_and_answers(box):
     answer = [m for m in d["messages"] if m["sender"] == "host"][-1]
     assert seal.parse(answer["body"])["t"] == "msg"          # what Orbit stored is an envelope
     text = me.unseal(answer["body"])
-    assert "scripted" in text and "3 words" in text and MODEL in text
+    assert "Scripted" in text and "3 words" in text and "No model runs here" in text
     # stop: closed like any session, and the envelopes are gone
     box.post(f"/sessions/{sid}/stop", follow_redirects=False)
     assert ">ended<" in box.get(f"/sessions/{sid}").text

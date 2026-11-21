@@ -141,3 +141,147 @@ footer { border-top: 1px solid var(--o-line); background: rgba(7,8,13,.5); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   html { scroll-behavior: auto; }
 }
+
+/* ---------- Pictures (orbit/scene.py). Each shape stands for a sentence. ---------- */
+.scene { display: block; width: 100%; height: auto; overflow: visible; }
+.scene.hero-scene { max-width: 560px; margin-inline: auto; }
+.scene.mini { width: 96px; height: 80px; }
+.scene.path { max-width: 520px; margin-inline: auto; }
+.lane { fill: none; stroke: rgba(255,255,255,.1); stroke-width: 1; }
+.link { stroke: rgba(155,184,255,.35); stroke-width: 1.2; stroke-dasharray: 2 6; stroke-linecap: round; }
+.star { fill: #dfe6ff; opacity: .5; }
+.star.t1 { animation: twinkle 5s ease-in-out infinite; }
+.star.t2 { animation: twinkle 7s ease-in-out -2s infinite; }
+.star.t3 { animation: twinkle 9s ease-in-out -5s infinite; }
+@keyframes twinkle { 50% { opacity: .1; } }
+.lbl { fill: var(--o-mute); font-size: 13px; text-anchor: middle; letter-spacing: .01em; }
+.lbl.strong { fill: var(--o-ink); font-weight: 650; }
+.lbl.dim { font-size: 11.5px; }
+.lbl.ok { fill: #6ee7b7; } .lbl.no { fill: #fca5a5; }
+
+/* comets: the models */
+.orbit { transform-origin: 0 0; animation: spin linear infinite; }
+.orbit.o0 { animation-duration: 9s; }
+.orbit.o1 { animation-duration: 22s; animation-delay: -6s; }
+.orbit.o2 { animation-duration: 34s; animation-delay: -19s; }
+.orbit.o3 { animation-duration: 50s; animation-delay: -31s; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.comet .tail { fill: none; stroke-linecap: round; }
+.comet .eye { fill: #fff; }
+.comet .halo { opacity: .22; }
+.comet.blue .tail { stroke: var(--o-blue); } .comet.blue .head, .comet.blue .halo { fill: var(--o-blue); }
+.comet.violet .tail { stroke: var(--o-violet); } .comet.violet .head, .comet.violet .halo { fill: var(--o-violet); }
+.comet.mint .tail { stroke: var(--o-mint); } .comet.mint .head, .comet.mint .halo { fill: var(--o-mint); }
+
+/* the core: your machine */
+.sun { fill: #ffd98a; }
+.glow { fill: #ffc861; }
+.glow.g1 { opacity: .22; } .glow.g2 { opacity: .11; } .glow.g3 { opacity: .06; }
+.core .glow { transform-origin: 0 0; animation: breathe 6s ease-in-out infinite; }
+@keyframes breathe { 50% { transform: scale(1.07); } }
+.rays { transform-origin: 0 0; animation: spin 80s linear infinite; }
+.rays line { stroke: #ffd98a; stroke-width: 1.6; stroke-linecap: round; opacity: .55; }
+.core .pulse { fill: none; stroke: #ffe7b3; stroke-width: 2; opacity: 0; transform-origin: 0 0; animation: arrive 9s ease-out infinite; }
+@keyframes arrive { 0%, 43% { opacity: 0; transform: scale(1); } 46% { opacity: .9; } 60%, 100% { opacity: 0; transform: scale(2.6); } }
+
+/* the phone: any browser */
+.phone rect { fill: #10131f; stroke: rgba(255,255,255,.5); stroke-width: 1.5; }
+.phone .screen { fill: rgba(107,150,255,.28); stroke: none; }
+.phone .ping { fill: none; stroke: var(--o-blue); stroke-width: 1.5; opacity: 0; transform-origin: 0 0; transform-box: fill-box; animation: land 9s ease-out infinite; }
+@keyframes land { 0%, 93% { opacity: 0; transform: scale(.6); } 95% { opacity: .8; } 100% { opacity: 0; transform: scale(1.5); } }
+
+/* the relay's gate: hollow, like the node in Orbit's mark. It lets the capsule through and sees no inside. */
+.gate-ring { fill: var(--o-bg); stroke: #c4cade; stroke-width: 2.5; }
+.gate-glow { fill: #c4cade; opacity: .08; }
+
+/* the sealed capsule: out to the machine, then back with the answer */
+.capsule rect { fill: #0b0e18; stroke: #e8ecf8; stroke-width: 1.4; }
+.capsule .lock { fill: none; stroke: #e8ecf8; stroke-width: 1.2; }
+.capsule .lock-body { fill: #e8ecf8; stroke: none; }
+.capsule.out { transform: translate(-153px, 79px); animation: send 9s cubic-bezier(.45,0,.4,1) infinite; }
+.capsule.back { opacity: 0; animation: answer 9s cubic-bezier(.45,0,.4,1) infinite; }
+@keyframes send {
+  0% { transform: translate(-229px, 118px); opacity: 0; } 4% { opacity: 1; }
+  40% { transform: translate(-22px, 11px); opacity: 1; } 45%, 100% { transform: translate(0, 0); opacity: 0; }
+}
+@keyframes answer {
+  0%, 52% { transform: translate(0, 0); opacity: 0; } 57% { transform: translate(-22px, 11px); opacity: 1; }
+  92% { transform: translate(-229px, 118px); opacity: 1; } 95%, 100% { transform: translate(-229px, 118px); opacity: 0; }
+}
+
+/* does it fit: a disc (the model) in a ring (the machine's memory) */
+.fit { flex-shrink: 0; overflow: visible; }
+.fit-ring { fill: none; stroke: rgba(255,255,255,.55); stroke-width: 1.6; }
+.fit-disc { opacity: .85; }
+.fit.fits .fit-disc { fill: #34d399; } .fit.tight .fit-disc { fill: #facc15; }
+.fit.too_big .fit-disc { fill: #f87171; opacity: .6; } .fit.too_big .fit-ring { stroke-dasharray: 3 3; }
+.fit.unknown .fit-disc { fill: none; stroke: #8e96ad; stroke-width: 1.4; stroke-dasharray: 2 4; }
+.fit-q { fill: #c4cade; font-size: 15px; font-weight: 700; text-anchor: middle; }
+.fit-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: .25rem; text-align: center; }
+.fit-strip .gbs { font-weight: 750; font-variant-numeric: tabular-nums; }
+.fit-strip .v { font-size: .78rem; color: var(--o-mute); }
+.verdict { font-weight: 700; }
+.verdict.fits { color: #6ee7b7; } .verdict.tight { color: #fde68a; } .verdict.too_big { color: #fca5a5; } .verdict.unknown { color: #c4cade; }
+
+/* the session glyph */
+.glyph { flex-shrink: 0; }
+.glyph.starting .orbit { animation-duration: 1.6s; }
+.glyph.starting .sun, .glyph.starting .glow { opacity: .25; }
+.glyph.ended .orbit { animation: none; opacity: .35; }
+.glyph.ended .sun { fill: #6a7189; } .glyph.ended .glow { opacity: 0; }
+
+/* the letters on the About page */
+.path .page { fill: rgba(107,150,255,.14); stroke: #9bb8ff; stroke-width: 1.4; }
+.path .ink { stroke: #cfdcff; stroke-width: 2; stroke-linecap: round; }
+.path .sealed { fill: #0b0e18; stroke: #c4cade; stroke-width: 1.4; }
+.path .flap { fill: none; stroke: #c4cade; stroke-width: 1.4; stroke-linejoin: round; }
+
+/* ---------- Fewer words: pictures with short captions, and the rest folded away ---------- */
+.hero-grid { display: grid; gap: 1rem; padding: 1.25rem 0 1.5rem; grid-template-areas: "title" "pic" "body"; }
+.hero-title { grid-area: title; font-weight: 800; letter-spacing: -.03em; line-height: 1.05; font-size: clamp(2.05rem, 9.2vw, 3.3rem); }
+.hero-pic { grid-area: pic; } .hero-body { grid-area: body; }
+@media (min-width: 992px) {
+  .hero-grid { grid-template-columns: 1fr 1.1fr; grid-template-areas: "title pic" "body pic"; column-gap: 2.5rem; row-gap: 1.25rem; padding: 3rem 0 2.5rem; }
+  .hero-title { align-self: end; } .hero-body { align-self: start; } .hero-pic { align-self: center; }
+}
+.hero-grid .lead { font-size: 1.12rem; line-height: 1.55; max-width: 26rem; }
+.steps3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; text-align: center; }
+.steps3 .cap { font-weight: 650; font-size: .95rem; line-height: 1.25; }
+.steps3 .scene { margin-inline: auto; }
+.steps3 > div { padding: 1rem .5rem; border: 1px solid var(--o-line); border-radius: var(--o-r); background: var(--o-glass); }
+.facts { display: grid; gap: .75rem; }
+@media (min-width: 768px) { .facts { grid-template-columns: repeat(3, 1fr); } }
+.fact { display: flex; gap: .9rem; align-items: center; padding: 1rem 1.1rem; border: 1px solid var(--o-line); border-radius: var(--o-r); background: var(--o-glass); }
+.fact b { display: block; } .fact span { color: var(--o-mute); font-size: .9rem; }
+.fact .role-ico { flex-shrink: 0; }
+details.fold { border: 1px solid var(--o-line); border-radius: 18px; background: var(--o-glass); margin-bottom: .6rem; overflow: hidden; }
+details.fold > summary { list-style: none; cursor: pointer; padding: 1rem 1.2rem; font-weight: 650; display: flex; justify-content: space-between; align-items: center; gap: 1rem; min-height: 3.25rem; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::after { content: "+"; font-size: 1.3rem; line-height: 1; color: var(--o-blue); transition: transform .2s; }
+details.fold[open] > summary::after { transform: rotate(45deg); }
+details.fold > .inside { padding: 0 1.2rem 1.1rem; color: var(--o-mute); }
+details.fold > .inside > :last-child { margin-bottom: 0; }
+details.quiet > summary { cursor: pointer; color: var(--o-mute); font-size: .85rem; list-style: none; display: inline-flex; align-items: center; gap: .35rem; padding: .35rem 0; }
+details.quiet > summary::-webkit-details-marker { display: none; }
+details.quiet > summary::after { content: "what this means"; text-decoration: underline; text-underline-offset: .2em; }
+details.quiet[open] > summary::after { content: "hide"; }
+.models { display: grid; grid-template-columns: repeat(2, 1fr); gap: .6rem; }
+@media (min-width: 768px) { .models { grid-template-columns: repeat(4, 1fr); } }
+.model-tile { display: flex; align-items: center; gap: .7rem; padding: .8rem .9rem; min-height: 4rem; border: 1px solid var(--o-line); border-radius: 18px; background: var(--o-glass); color: var(--o-ink); text-decoration: none; transition: border-color .15s, background .15s, transform .15s; }
+.model-tile:hover, .model-tile:focus-visible { border-color: rgba(107,150,255,.55); background: var(--o-glass-2); color: #fff; transform: translateY(-1px); }
+.model-tile b { display: block; line-height: 1.15; } .model-tile span { color: var(--o-mute); font-size: .8rem; }
+.model-tile .bead { flex-shrink: 0; border-radius: 50%; background: linear-gradient(135deg, var(--o-blue), var(--o-violet)); }
+.bead.s1 { width: .7rem; height: .7rem; } .bead.s2 { width: .95rem; height: .95rem; } .bead.s3 { width: 1.5rem; height: 1.5rem; } .bead.s4 { width: 2.1rem; height: 2.1rem; }
+.machine-row { display: flex; align-items: center; gap: 1rem; }
+.machine-row .grow { flex: 1; min-width: 0; }
+.machine-row .btn { min-height: 2.9rem; min-width: 6.5rem; }
+.ribbon { font-size: .8rem; }
+@media (max-width: 575.98px) {
+  .btn-lg { width: 100%; }
+  .hero-grid .d-flex > form { width: 100%; }
+  .machine-row { gap: .75rem; } .machine-row .btn { min-width: 5.25rem; }
+  .steps3 .cap { font-size: .82rem; }
+  .lbl { font-size: 15px; } .lbl.dim { font-size: 13px; }
+}
+.nb { white-space: nowrap; }
+.display-5.wide { max-width: none; }

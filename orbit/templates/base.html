@@ -37,7 +37,7 @@
           <li class="nav-item"><a class="nav-link" href="/account"><i class="bi bi-person-circle me-1"></i>{{ 'Guest' if sandbox else 'Account' }}</a></li>
           <li class="nav-item"><form method="post" action="/logout"><button class="btn btn-outline-light btn-sm">{{ 'Leave' if sandbox else 'Sign out' }}</button></form></li>
         {% elif sandbox %}
-          <li class="nav-item"><form method="post" action="/sandbox/enter"><button class="btn btn-primary" data-busy="Opening…">Enter the sandbox</button></form></li>
+          <li class="nav-item"><form method="post" action="/sandbox/enter"><button class="btn btn-primary" data-busy="Opening…">Try it</button></form></li>
         {% else %}
           <li class="nav-item"><a class="nav-link" href="/login">Sign in</a></li>
           <li class="nav-item"><a class="btn btn-primary" href="/signup">Get started</a></li>
@@ -47,7 +47,7 @@
   </div>
 </nav>
 {% if sandbox %}
-<div class="ribbon"><div class="container"><span class="ribbon-tag">Sandbox</span> Simulated machines and scripted replies. No model runs here. The data is wiped often.</div></div>
+<div class="ribbon"><div class="container"><span class="ribbon-tag">Sandbox</span> Simulated machines. Scripted replies. Nothing is kept.</div></div>
 {% endif %}
 
 <main class="flex-grow-1" id="main">
@@ -60,9 +60,7 @@
   <div class="container d-flex flex-column flex-md-row justify-content-between gap-3 text-secondary small">
     <div class="foot-about">
       <div class="fw-semibold text-body">Orbit</div>
-      Free and open source. Models run on your own machines, not here. No fees, no ads, no rented servers.
-      {% if sandbox %}<div class="text-warning mt-2">This is the sandbox. Nothing on it is real.</div>
-      {% endif %}
+      Free. Open source. Your machines only.
     </div>
     <div class="d-flex gap-4 flex-wrap">
       <div><div class="fw-semibold text-body mb-1">Use</div><a class="d-block link-secondary" href="/run">Run a model</a><a class="d-block link-secondary" href="/hosts">My machines</a></div>

@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from . import auth, db, fit, sandbox
+from . import auth, db, fit, sandbox, scene
 
 SANDBOX = sandbox.ENABLED  # the public demo: guests and simulated machines. See sandbox.py.
 DEV = os.environ.get("ORBIT_DEV") == "1"
@@ -49,7 +49,7 @@ app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
 templates = Jinja2Templates(directory=HERE / "templates")
 templates.env.filters["who"] = lambda email: ("Guest " + email[6:14]) if email.endswith("@sandbox.invalid") else email
 templates.env.filters["gb"] = lambda n: f"{n:g}"  # 24.0 reads as 24
-templates.env.globals.update(sandbox=SANDBOX, repo_url=REPO_URL)
+templates.env.globals.update(sandbox=SANDBOX, repo_url=REPO_URL, scene=scene)
 
 _db_ready = False
 
@@ -173,6 +173,15 @@ def valid_model(model: str) -> bool:
     The name ends up on a host's command line, so nothing else is let through.
     """
     return len(model) <= MODEL_MAX_CHARS and _MODEL.fullmatch(model) is not None
+
+
+def short_model(model: str) -> str:
+    """'bartowski/Qwen2.5-7B-Instruct-GGUF Q4_K_M' as a person would say it: 'Qwen2.5-7B-Instruct'."""
+    name = model.split("/")[-1].split(" ")[0]
+    return re.sub(r"(?i)[-_.]?gguf$", "", name) or model
+
+
+templates.env.filters["short"] = short_model
 
 
 def nav_ctx(conn: sqlite3.Connection, user) -> dict:

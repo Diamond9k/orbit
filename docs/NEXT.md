@@ -46,6 +46,11 @@ The previous builder failed by widening scope, so keep each item to its named fi
   Add one before the verified tier, when the browser starts checking attestations.
 
 ## Done
+- 2026-11-20, asked for by Cooper: pictures in place of sentences (`orbit/scene.py`). The start
+  page is one drawn scene: models as comets around your machine, a sealed capsule from any
+  browser through a relay gate that cannot open it. Fit is a disc in a ring, to scale. The About
+  page is one picture and folded answers. The start page went from about 330 words to under 130.
+  Phone use: model tiles to tap, one-row machines, short names, Stop beside the title.
 - 2026-11-20, decided by Cooper: self-hosting only, no money (decision file of the same date).
   Removed the ledger, the store, Stripe, prices and Orbit's cut. A machine is seen and used
   only by its owner. The sandbox gives each guest simulated machines. CLAUDE.md goal and rules

@@ -172,11 +172,8 @@ def _reply(model: str, words: int, envelope_chars: int, n: int, sealed: bool) ->
         return (f"Scripted reply {n}. No model runs in the sandbox. Your message of {words} {word} "
                 "arrived unsealed, so the relay could read it.")
     if n == 1:
-        return ("This is a scripted reply. No model runs in the sandbox.\n\n"
-                "What happened to your message: your browser sealed it with a key made for this session. "
-                f"The relay stored and passed on an envelope of {envelope_chars} characters. The simulated "
-                f"machine opened it and counted {words} {word}. This reply came back to you sealed the same way.\n\n"
-                f"On your own machine, {model} runs there and answers here. The key stays on that machine, "
-                "so the only computer that reads your words is yours.")
+        return ("Scripted reply. No model runs here.\n\n"
+                f"Your browser sealed your message. The relay passed on an envelope of {envelope_chars} characters. "
+                f"The simulated machine opened it and counted {words} {word}. This reply came back sealed too.")
     return (f"Scripted reply {n}. Envelope of {envelope_chars} characters in, {words} {word} read by the "
             "simulated machine, reply sealed on the way back. No model wrote this.")

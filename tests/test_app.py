@@ -65,7 +65,7 @@ def test_nobody_else_can_see_or_use_a_machine(client):
         assert r.headers["location"].startswith("/?model=")       # refused: not their machine
     with TestClient(app) as anyone:                                # signed out: a fit table, never a machine
         page = anyone.get("/?model=x/Model-7B-Q4_K_M").text
-        assert "Will it fit?" in page and "Quadro Zed" not in page
+        assert "fit-strip" in page and "Quadro Zed" not in page
 
 
 def test_an_old_database_with_prices_is_brought_up_to_date(tmp_path):
@@ -211,7 +211,7 @@ def _set(sql, *args):
 def test_a_session_runs_as_long_as_the_machine_does(client):
     token = _ready_session(client)
     _set("UPDATE sessions SET ready_at = ? WHERE id = 1", _stamp(1200))  # twenty hours on your own machine: nothing cuts it off
-    assert ">running<" in client.get("/sessions/1").text.replace('<span class="dot live me-2"></span>', "")
+    assert 'data-phase="running"' in client.get("/sessions/1").text
     assert client.post("/api/hosts/heartbeat", data={"token": token}).json()["session"]["id"] == 1
 
 
